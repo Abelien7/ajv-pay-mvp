@@ -1,0 +1,41 @@
+{
+  "name": "ajv-pay-mvp",
+  "version": "0.1.0",
+  "description": "AJV Pay - MVP fintech payment backend (monolithe modulaire, NestJS + PostgreSQL)",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "start:prod": "node scripts/migrate.js && node dist/main.js",
+    "start:dev": "nest start --watch",
+    "migrate": "node scripts/migrate.js",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.4.0",
+    "@nestjs/core": "^10.4.0",
+    "@nestjs/platform-express": "^10.4.0",
+    "@nestjs/config": "^3.2.3",
+    "@nestjs/schedule": "^4.1.0",
+    "@nestjs/throttler": "^5.2.0",
+    "axios": "^1.7.7",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "dotenv": "^16.4.5",
+    "helmet": "^7.1.0",
+    "pg": "^8.12.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^10.4.5",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.0",
+    "@types/pg": "^8.11.6",
+    "@types/uuid": "^9.0.8",
+    "typescript": "^5.5.4",
+    "ts-node": "^10.9.2"
+  }
+}

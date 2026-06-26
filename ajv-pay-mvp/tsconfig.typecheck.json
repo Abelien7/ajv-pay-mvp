@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": [],
+    "ignoreDeprecations": "6.0"
+  },
+  "include": ["src/**/*.ts", "typecheck/**/*.ts"],
+  "ts-node": {
+    "files": true
+  }
+}
