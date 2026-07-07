@@ -11,26 +11,27 @@ import {
 } from '../connector.interface';
 
 /**
- * Adapter Flooz.
+ * Adapter Mixx by Yas (Togocom, ex-T-Money — Flooz, lui, a été rebaptisé
+ * Moov Money, déjà couvert par MoovAdapter).
  *
- * IMPORTANT — ce qui est réel vs ce qui reste à confirmer avec Flooz :
+ * IMPORTANT — ce qui est réel vs ce qui reste à confirmer avec Yas/Togocom :
  *   - La structure HTTP (méthode, headers Bearer, timeout, gestion d'erreur,
  *     mapping de statuts) est une implémentation RÉELLE et fonctionnelle.
- *   - Les chemins exacts d'URL (`FLOOZ_COLLECT_PATH`, `FLOOZ_STATUS_PATH`,
- *     `FLOOZ_REFUND_PATH`) et les noms de champs JSON (`merchant_code`,
+ *   - Les chemins exacts d'URL (`MIXX_COLLECT_PATH`, `MIXX_STATUS_PATH`,
+ *     `MIXX_REFUND_PATH`) et les noms de champs JSON (`merchant_code`,
  *     `transaction_id`, ...) sont ceux d'une intégration mobile money
  *     "collect" standard en Afrique de l'Ouest, mais DOIVENT être confirmés
- *     avec la documentation technique/commerciale Flooz obtenue à
+ *     avec la documentation technique/commerciale Mixx by Yas obtenue à
  *     l'onboarding — ils sont 100% configurables via `.env` pour ne
  *     nécessiter aucune modification de code une fois confirmés.
- *   - Le header de signature webhook (`FLOOZ_WEBHOOK_SIGNATURE_HEADER`) est
- *     un nom par défaut générique (`x-flooz-signature`) — à remplacer par le
- *     nom réel documenté par Flooz dès qu'il est connu.
+ *   - Le header de signature webhook (`MIXX_WEBHOOK_SIGNATURE_HEADER`) est
+ *     un nom par défaut générique (`x-mixx-signature`) — à remplacer par le
+ *     nom réel documenté par Yas/Togocom dès qu'il est connu.
  */
 @Injectable()
-export class FloozAdapter implements PaymentProviderAdapter {
-  readonly name = 'flooz' as const;
-  private readonly logger = new Logger(FloozAdapter.name);
+export class MixxAdapter implements PaymentProviderAdapter {
+  readonly name = 'mixx' as const;
+  private readonly logger = new Logger(MixxAdapter.name);
 
   private readonly baseUrl: string;
   private readonly apiKey: string;
@@ -42,14 +43,14 @@ export class FloozAdapter implements PaymentProviderAdapter {
   private readonly webhookSignatureHeader: string;
 
   constructor(private readonly config: ConfigService) {
-    this.baseUrl = this.config.get<string>('FLOOZ_API_BASE_URL', '');
-    this.apiKey = this.config.get<string>('FLOOZ_API_KEY', '');
-    this.merchantCode = this.config.get<string>('FLOOZ_MERCHANT_CODE', '');
-    this.collectPath = this.config.get<string>('FLOOZ_COLLECT_PATH', '/v1/collect');
-    this.statusPath = this.config.get<string>('FLOOZ_STATUS_PATH', '/v1/collect');
-    this.refundPath = this.config.get<string>('FLOOZ_REFUND_PATH', '/v1/refund');
-    this.webhookSecret = this.config.get<string>('FLOOZ_WEBHOOK_SECRET', '');
-    this.webhookSignatureHeader = this.config.get<string>('FLOOZ_WEBHOOK_SIGNATURE_HEADER', 'x-flooz-signature');
+    this.baseUrl = this.config.get<string>('MIXX_API_BASE_URL', '');
+    this.apiKey = this.config.get<string>('MIXX_API_KEY', '');
+    this.merchantCode = this.config.get<string>('MIXX_MERCHANT_CODE', '');
+    this.collectPath = this.config.get<string>('MIXX_COLLECT_PATH', '/v1/collect');
+    this.statusPath = this.config.get<string>('MIXX_STATUS_PATH', '/v1/collect');
+    this.refundPath = this.config.get<string>('MIXX_REFUND_PATH', '/v1/refund');
+    this.webhookSecret = this.config.get<string>('MIXX_WEBHOOK_SECRET', '');
+    this.webhookSignatureHeader = this.config.get<string>('MIXX_WEBHOOK_SIGNATURE_HEADER', 'x-mixx-signature');
   }
 
   private client() {
@@ -63,7 +64,7 @@ export class FloozAdapter implements PaymentProviderAdapter {
 
   async initiate(params: InitiateParams): Promise<InitiateResult> {
     this.logger.log(
-      `Initiation Flooz payment=${params.paymentId} amount=${params.amount} phone=${params.phoneNumber}`,
+      `Initiation Mixx payment=${params.paymentId} amount=${params.amount} phone=${params.phoneNumber}`,
     );
 
     const response = await this.client().post(this.collectPath, {
@@ -76,14 +77,14 @@ export class FloozAdapter implements PaymentProviderAdapter {
 
     if (response.status >= 400) {
       throw new Error(
-        `Flooz a refusé l'initiation (HTTP ${response.status}): ${JSON.stringify(response.data)}`,
+        `Mixx a refusé l'initiation (HTTP ${response.status}): ${JSON.stringify(response.data)}`,
       );
     }
 
     const data = response.data;
     const providerReference: string | undefined = data?.transaction_id ?? data?.reference;
     if (!providerReference) {
-      throw new Error(`Réponse Flooz inattendue, aucune référence de transaction trouvée: ${JSON.stringify(data)}`);
+      throw new Error(`Réponse Mixx inattendue, aucune référence de transaction trouvée: ${JSON.stringify(data)}`);
     }
 
     const mapped = this.mapStatus(data?.status ?? data?.transaction_status);
@@ -97,7 +98,7 @@ export class FloozAdapter implements PaymentProviderAdapter {
     const response = await this.client().get(`${this.statusPath}/${providerReference}`);
 
     if (response.status >= 400) {
-      throw new Error(`Flooz checkStatus a échoué (HTTP ${response.status}): ${JSON.stringify(response.data)}`);
+      throw new Error(`Mixx checkStatus a échoué (HTTP ${response.status}): ${JSON.stringify(response.data)}`);
     }
 
     const data = response.data;
@@ -111,10 +112,10 @@ export class FloozAdapter implements PaymentProviderAdapter {
   }
 
   /**
-   * Interprète le payload webhook envoyé par Flooz. La structure exacte
+   * Interprète le payload webhook envoyé par Mixx. La structure exacte
    * (noms de champs, valeurs de statut) doit être ajustée selon la doc
-   * Flooz réelle — ce mapping illustre le principe : traduire le
-   * vocabulaire du provider vers les statuts normalisés AJV Pay.
+   * réelle — ce mapping illustre le principe : traduire le vocabulaire du
+   * provider vers les statuts normalisés AJV Pay.
    */
   parseWebhook(payload: any): WebhookParseResult {
     const providerStatus: string = payload?.status ?? payload?.transaction_status;
@@ -133,7 +134,7 @@ export class FloozAdapter implements PaymentProviderAdapter {
     });
 
     if (response.status >= 400) {
-      this.logger.error(`Remboursement Flooz refusé (HTTP ${response.status}): ${JSON.stringify(response.data)}`);
+      this.logger.error(`Remboursement Mixx refusé (HTTP ${response.status}): ${JSON.stringify(response.data)}`);
       return { success: false };
     }
     return { success: true };
@@ -142,7 +143,7 @@ export class FloozAdapter implements PaymentProviderAdapter {
   /**
    * Vérification générique de signature HMAC-SHA256 du corps brut, motif le
    * plus courant côté providers mobile money ouest-africains. Si
-   * `FLOOZ_WEBHOOK_SECRET` n'est pas configuré, retourne `undefined`
+   * `MIXX_WEBHOOK_SECRET` n'est pas configuré, retourne `undefined`
    * (= "non configuré", traité explicitement comme un avertissement par
    * `ProviderWebhooksController`, jamais comme un succès silencieux).
    */

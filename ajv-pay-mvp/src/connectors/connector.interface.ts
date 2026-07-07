@@ -1,11 +1,12 @@
 /**
- * Interface commune que chaque provider (Flooz, Moov, CinetPay, plus tard
- * Wave/Mixx) doit implémenter. Le code métier (PaymentsService) ne dépend
- * jamais d'un provider concret, uniquement de cette interface — c'est ce
- * qui permet d'ajouter un nouveau provider en ajoutant un seul fichier
- * adapter, sans toucher à `PaymentsService` ni à `PaymentOrchestrator`.
+ * Interface commune que chaque provider (Moov Money, Mixx by Yas, plus le
+ * provider "manual" — vérification humaine) doit implémenter. Le code
+ * métier (PaymentsService) ne dépend jamais d'un provider concret,
+ * uniquement de cette interface — c'est ce qui permet d'ajouter un nouveau
+ * provider en ajoutant un seul fichier adapter, sans toucher à
+ * `PaymentsService` ni à `PaymentOrchestrator`.
  */
-export type ProviderName = 'flooz' | 'moov' | 'cinetpay';
+export type ProviderName = 'moov' | 'mixx' | 'manual';
 
 export interface InitiateParams {
   paymentId: string;
@@ -40,9 +41,9 @@ export interface PaymentProviderAdapter {
 
   /**
    * `true` si le contenu du webhook de ce provider ne doit jamais être
-   * considéré comme fiable par lui-même (ex: CinetPay) — dans ce cas,
-   * `PaymentOrchestrator` rappelle systématiquement `checkStatus()` après
-   * `parseWebhook()` et utilise son résultat comme source de vérité.
+   * considéré comme fiable par lui-même — dans ce cas, `PaymentOrchestrator`
+   * rappelle systématiquement `checkStatus()` après `parseWebhook()` et
+   * utilise son résultat comme source de vérité.
    */
   readonly confirmViaStatusCheck?: boolean;
 

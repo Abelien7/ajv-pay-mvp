@@ -17,7 +17,7 @@ import { AuditLogService } from '../audit/audit-log.service';
 
 /**
  * Endpoint public (pas d'ApiKeyGuard ici, car appelé par le provider, pas
- * par le marchand) recevant les notifications Flooz/Moov/CinetPay. Délègue
+ * par le marchand) recevant les notifications Moov/Mixx. Délègue
  * la logique métier à PaymentOrchestrator — ce controller ne fait que :
  *   1. déterminer sans ambiguïté le provider concerné (par la route appelée),
  *   2. vérifier l'authenticité du webhook (signature) avant tout traitement,
@@ -39,17 +39,6 @@ export class ProviderWebhooksController {
     private readonly audit: AuditLogService,
   ) {}
 
-  @Post('flooz')
-  @HttpCode(200)
-  async handleFloozWebhook(
-    @Req() req: RawBodyRequest<Request>,
-    @Body() body: unknown,
-    @Headers() headers: Record<string, string | string[] | undefined>,
-  ) {
-    await this.handle('flooz', req, body, headers);
-    return { received: true };
-  }
-
   @Post('moov')
   @HttpCode(200)
   async handleMoovWebhook(
@@ -61,14 +50,14 @@ export class ProviderWebhooksController {
     return { received: true };
   }
 
-  @Post('cinetpay')
+  @Post('mixx')
   @HttpCode(200)
-  async handleCinetPayWebhook(
+  async handleMixxWebhook(
     @Req() req: RawBodyRequest<Request>,
     @Body() body: unknown,
     @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
-    await this.handle('cinetpay', req, body, headers);
+    await this.handle('mixx', req, body, headers);
     return { received: true };
   }
 

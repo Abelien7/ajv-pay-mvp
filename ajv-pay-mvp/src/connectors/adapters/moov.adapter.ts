@@ -11,7 +11,7 @@ import {
 } from '../connector.interface';
 
 /**
- * Adapter Moov Money — même remarque que FloozAdapter : la structure HTTP
+ * Adapter Moov Money — même remarque que MixxAdapter : la structure HTTP
  * (auth Bearer, timeout, mapping de statuts, signature webhook générique)
  * est réelle et fonctionnelle ; les chemins d'URL et noms de champs exacts
  * restent à confirmer avec la documentation technique Moov Africa obtenue à

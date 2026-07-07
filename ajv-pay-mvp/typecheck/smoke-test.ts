@@ -51,7 +51,7 @@ async function main() {
   console.log('\n[1] HMAC util');
   {
     const secret = 'merchant-secret-key';
-    const body = JSON.stringify({ amount: 5000, method: 'flooz' });
+    const body = JSON.stringify({ amount: 5000, method: 'mixx' });
 
     const sig1 = computeHmacSignature(secret, body);
     const sig2 = computeHmacSignature(secret, body);
@@ -90,7 +90,7 @@ async function main() {
       merchantId: 'm1',
       currency: 'XOF',
       reference: 'payment:p1',
-      lines: ledger.buildSuccessEntries(5000, 'provider_flooz'),
+      lines: ledger.buildSuccessEntries(5000, 'provider_mixx'),
     });
     check('2 lignes insérées pour un paiement réussi', insertedRows.length === 2);
     check(
@@ -108,7 +108,7 @@ async function main() {
         currency: 'XOF',
         reference: 'payment:p2',
         lines: [
-          { account: 'provider_flooz', direction: 'credit', amount: 5000 },
+          { account: 'provider_mixx', direction: 'credit', amount: 5000 },
           { account: 'merchant_payable', direction: 'debit', amount: 4000 }, // déséquilibré !
         ],
       }),
@@ -191,10 +191,10 @@ async function main() {
       merchant_id: 'm1',
       amount: 5000,
       currency: 'XOF',
-      method: 'flooz',
+      method: 'mixx',
       phone_number: '+22890000000',
       status: 'processing',
-      provider_reference: 'flooz-ref-1',
+      provider_reference: 'mixx-ref-1',
       idempotency_key: 'key-1',
       metadata: null,
     };
@@ -226,9 +226,9 @@ async function main() {
 
     const fakeConnector: any = {
       parseWebhook: () => ({
-        providerReference: 'flooz-ref-1',
+        providerReference: 'mixx-ref-1',
         status: 'succeeded',
-        raw: { transaction_id: 'flooz-ref-1' },
+        raw: { transaction_id: 'mixx-ref-1' },
       }),
       requiresStatusConfirmation: () => false,
     };
@@ -244,7 +244,7 @@ async function main() {
       outboxService,
     );
 
-    await orchestrator.handleProviderWebhook('flooz', { transaction_id: 'flooz-ref-1', status: 'SUCCESS' });
+    await orchestrator.handleProviderWebhook('mixx', { transaction_id: 'mixx-ref-1', status: 'SUCCESS' });
 
     check('Une seule transaction SQL ouverte pour toute la transition finale', transactionCount === 1);
     check(

@@ -6,7 +6,7 @@ import { MerchantsModule } from '../merchants/merchants.module';
 
 /**
  * Ce module ne gère QUE les webhooks sortants (notifications vers les
- * marchands). Les webhooks entrants des providers (Flooz/Moov) sont reçus
+ * marchands). Les webhooks entrants des providers (Moov/Mixx) sont reçus
  * par ProviderWebhooksController, déclaré dans PaymentsModule, pour éviter
  * une dépendance circulaire (ce controller a besoin de PaymentsService).
  */

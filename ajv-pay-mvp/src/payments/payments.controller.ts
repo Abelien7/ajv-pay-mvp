@@ -15,6 +15,8 @@ import { PaymentsService } from './payments.service';
 import { PaymentOrchestrator } from '../orchestrator/payment-orchestrator.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { Merchant } from '../merchants/merchant.entity';
+import { ManualPaymentsService } from '../manual-payments/manual-payments.service';
+import { SubmitProofDto } from '../manual-payments/dto/submit-proof.dto';
 
 @Controller('payments')
 @UseGuards(ApiKeyGuard)
@@ -22,7 +24,20 @@ export class PaymentsController {
   constructor(
     private readonly orchestrator: PaymentOrchestrator,
     private readonly payments: PaymentsService,
+    private readonly manualPayments: ManualPaymentsService,
   ) {}
+
+  /**
+   * Info publique (mais authentifiée marchand, par cohérence avec le reste)
+   * pour le provider 'manual' : numéro marchand + syntaxe USSD pour chacun
+   * des deux réseaux (Moov Money, Mixx by Yas). Volontairement séparé du
+   * payload de création de paiement — ces informations sont fixes et
+   * partagées par tous les paiements manuels, pas une donnée par paiement.
+   */
+  @Get('manual/info')
+  manualInfo() {
+    return this.manualPayments.getAllNetworksInfo();
+  }
 
   /**
    * L'écriture (création de paiement) passe TOUJOURS par l'orchestrateur —
@@ -70,6 +85,25 @@ export class PaymentsController {
     await this.payments.getPayment(merchant.id, id); // lève 404 si le paiement n'appartient pas à ce marchand
     const payment = await this.orchestrator.refundPayment(id);
     return this.toResponse(payment);
+  }
+
+  /**
+   * Soumet la preuve de paiement (ID de transaction mobile money) qu'un
+   * client a communiquée au marchand pour un paiement 'manual'. Appelé par
+   * le marchand (Mavahi, etc.) pour le compte de son client — le client
+   * final ne parle jamais directement à AJV Pay. Ne change PAS le statut du
+   * paiement : ça reste 'processing' jusqu'à la revue de l'admin plateforme
+   * (voir ManualReviewController).
+   */
+  @Post(':id/submit-proof')
+  @HttpCode(200)
+  async submitProof(
+    @CurrentMerchant() merchant: Merchant,
+    @Param('id') id: string,
+    @Body() dto: SubmitProofDto,
+  ) {
+    await this.manualPayments.submitProof(id, merchant.id, dto.reference, dto.note);
+    return { status: 'submitted' };
   }
 
   private toResponse(payment: any) {

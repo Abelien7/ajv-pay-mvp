@@ -11,7 +11,7 @@ export interface Payment {
   merchant_id: string;
   amount: number;
   currency: string;
-  method: 'flooz' | 'moov' | 'cinetpay';
+  method: 'moov' | 'mixx' | 'manual';
   phone_number: string | null;
   status: PaymentStatus;
   provider_reference: string | null;

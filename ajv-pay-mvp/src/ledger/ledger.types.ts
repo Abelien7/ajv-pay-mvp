@@ -1,12 +1,12 @@
 export type LedgerAccount =
   | 'ajv_cash'
   | 'merchant_payable'
-  | 'provider_flooz'
   | 'provider_moov'
-  | 'provider_cinetpay'
+  | 'provider_mixx'
+  | 'provider_manual'
   | 'fees';
 
-export type ProviderLedgerAccount = 'provider_flooz' | 'provider_moov' | 'provider_cinetpay';
+export type ProviderLedgerAccount = 'provider_moov' | 'provider_mixx' | 'provider_manual';
 
 export type LedgerDirection = 'debit' | 'credit';
 

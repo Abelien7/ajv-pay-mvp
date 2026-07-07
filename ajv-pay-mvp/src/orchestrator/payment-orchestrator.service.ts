@@ -82,17 +82,17 @@ export class PaymentOrchestrator {
   }
 
   /**
-   * Traite un webhook entrant provider (Flooz/Moov/CinetPay) : résout le
+   * Traite un webhook entrant provider (Moov/Mixx) : résout le
    * paiement via provider_reference, puis applique la même transaction
    * atomique que createPayment pour la transition finale.
    *
    * `provider` est déterminé sans ambiguïté par la route HTTP appelée
-   * (/webhooks/flooz, /webhooks/moov, /webhooks/cinetpay) — voir
-   * `ProviderWebhooksController`. Si l'adapter du provider est marqué
-   * `confirmViaStatusCheck` (cas de CinetPay, dont le contenu du webhook
-   * n'est pas jugé fiable par sa propre documentation), on ignore le statut
-   * annoncé par le webhook et on rappelle activement `checkStatus()` comme
-   * source de vérité avant toute transition.
+   * (/webhooks/moov, /webhooks/mixx) — voir `ProviderWebhooksController`.
+   * Si l'adapter du provider est marqué `confirmViaStatusCheck` (utile pour
+   * un provider dont le contenu du webhook n'est pas jugé fiable par sa
+   * propre documentation), on ignore le statut annoncé par le webhook et on
+   * rappelle activement `checkStatus()` comme source de vérité avant toute
+   * transition. Ni Moov ni Mixx ne l'activent aujourd'hui.
    */
   async handleProviderWebhook(provider: ProviderName, payload: unknown): Promise<void> {
     const parsed = this.connector.parseWebhook(provider, payload);
@@ -145,6 +145,42 @@ export class PaymentOrchestrator {
     }
 
     return this.commitFinalState(paymentId, 'refunded', {});
+  }
+
+  /**
+   * Confirme un paiement 'manual' après vérification humaine par l'admin
+   * plateforme (voir ManualReviewController) — remplace, pour ce provider,
+   * l'appel à `connector.checkStatus`/webhook des autres providers : la
+   * décision de l'admin EST la source de vérité. Passe par le même
+   * `commitFinalState` que tout le reste (statut + ledger + outbox en une
+   * seule transaction), donc le marchand reçoit sa notification webhook
+   * exactement comme pour Moov/Mixx.
+   */
+  async confirmManualPayment(paymentId: string): Promise<Payment> {
+    const payment = await this.getManualPaymentAwaitingReview(paymentId);
+    return this.commitFinalState(paymentId, 'succeeded', { manual_review: 'confirmed' }, payment.provider_reference ?? undefined);
+  }
+
+  /** Symétrique de confirmManualPayment() pour un rejet (référence introuvable/montant ne correspondant pas, etc.). */
+  async rejectManualPayment(paymentId: string): Promise<Payment> {
+    await this.getManualPaymentAwaitingReview(paymentId);
+    return this.commitFinalState(paymentId, 'failed', { manual_review: 'rejected' });
+  }
+
+  private async getManualPaymentAwaitingReview(paymentId: string): Promise<Payment> {
+    const payment = await this.payments.getPaymentById(paymentId);
+    if (!payment) {
+      throw new NotFoundException(`Payment ${paymentId} introuvable.`);
+    }
+    if (payment.method !== 'manual') {
+      throw new BadRequestException(`Payment ${paymentId} n'est pas de type "manual" (method=${payment.method}).`);
+    }
+    if (payment.status !== 'processing') {
+      throw new BadRequestException(
+        `Payment ${paymentId} a déjà le statut "${payment.status}" — rien à confirmer/rejeter.`,
+      );
+    }
+    return payment;
   }
 
   /**

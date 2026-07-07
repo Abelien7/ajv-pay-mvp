@@ -4,7 +4,7 @@ import { DatabaseService } from '../database/database.service';
 import { LedgerLine, ProviderLedgerAccount } from './ledger.types';
 import { Payment } from '../payments/payment.entity';
 
-/** `payment.method` ('flooz'|'moov'|'cinetpay') -> compte ledger correspondant ('provider_<method>'). */
+/** `payment.method` ('moov'|'mixx'|'manual') -> compte ledger correspondant ('provider_<method>'). */
 export function providerLedgerAccount(method: Payment['method']): ProviderLedgerAccount {
   return `provider_${method}` as ProviderLedgerAccount;
 }

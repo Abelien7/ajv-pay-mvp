@@ -1,5 +1,5 @@
 export type PaymentStatus = 'pending' | 'processing' | 'succeeded' | 'failed' | 'expired' | 'refunded';
-export type PaymentMethod = 'flooz' | 'moov' | 'cinetpay';
+export type PaymentMethod = 'moov' | 'mixx' | 'manual';
 
 export interface PaymentDto {
   id: string;

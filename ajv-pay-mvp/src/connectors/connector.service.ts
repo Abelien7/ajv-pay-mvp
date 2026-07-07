@@ -13,7 +13,7 @@ import { Payment } from '../payments/payment.entity';
  * Façade autour du registre de tous les providers actifs. Route chaque
  * opération vers l'adapter correspondant au `method` du paiement (ou au nom
  * de provider explicite, ex: pour les webhooks, où la route HTTP appelée
- * — /webhooks/flooz, /webhooks/moov, /webhooks/cinetpay — désigne déjà sans
+ * — /webhooks/moov, /webhooks/mixx — désigne déjà sans
  * ambiguïté le provider concerné). C'est la seule classe que
  * PaymentOrchestrator connaît de la couche connector — ni PaymentsService
  * ni le reste du métier n'appellent plus jamais un adapter directement.
