@@ -1,8 +1,14 @@
-# Dashboard marchand
+# Dashboard (marchand + admin plateforme)
 
 Petite application React + TypeScript (`ajv-pay-mvp/dashboard/`, séparée du
-backend) consommant l'API AJV Pay : solde à reverser, configuration de
-l'URL de webhook, liste des paiements récents.
+backend), deux vues distinctes :
+
+- **Marchand** : solde à reverser, configuration de l'URL de webhook, liste
+  des paiements récents, remboursement.
+- **Admin plateforme** (accessible via le lien "Vous êtes l'admin
+  plateforme ?" sur l'écran de connexion marchand) : file d'attente
+  centralisée des paiements manuels de TOUS les marchands connectés, avec
+  actions Confirmer/Rejeter — voir `AdminDashboard.tsx`.
 
 ## Lancer en local
 
@@ -12,15 +18,22 @@ npm install
 npm run dev   # http://localhost:5174
 ```
 
-Connecte-toi avec l'API Key et le HMAC Secret affichés lors de la création
-du marchand (`node scripts/create-merchant.js ...`), et l'URL de l'API
-backend (`http://localhost:3000` par défaut).
+**Marchand** : connecte-toi avec l'API Key et le HMAC Secret affichés lors
+de la création du marchand (`node scripts/create-merchant.js ...`).
+
+**Admin** : connecte-toi avec `ADMIN_API_KEY` (celle configurée côté
+backend) — pas de secret HMAC nécessaire pour cette vue.
+
+Dans les deux cas, l'URL de l'API backend est éditable dans le formulaire ;
+`VITE_API_BASE_URL` (voir `.env.production`) fixe la valeur par défaut au
+moment du build.
 
 ## Endpoints utilisés
 
 - `GET /merchants/me` — solde (`LedgerService.getMerchantBalance`), statut, URL webhook actuelle.
 - `PATCH /merchants/me/webhook-url` — met à jour l'URL de notification.
 - `GET /payments?limit=&offset=` — liste paginée, triée par date décroissante.
+- `GET /admin/manual-payments/pending`, `POST .../:id/confirm`, `POST .../:id/reject` — vue admin.
 
 ## Limitation de sécurité connue (à corriger avant tout marchand non technique)
 
@@ -43,3 +56,10 @@ Avant d'ouvrir ce dashboard à des marchands externes non techniques :
 
 Pour un usage interne (équipe AJV Pay testant ses propres marchands), le
 compromis actuel est acceptable et documenté ici en toute transparence.
+
+La vue admin a le même type de compromis (la clé `ADMIN_API_KEY` transite
+par un champ du navigateur) mais un profil de risque différent : une seule
+clé, un seul utilisateur humain prévu (toi), pas de secret HMAC à protéger
+en plus. Acceptable pour l'usage actuel, à revoir si un jour plusieurs
+personnes doivent partager l'accès admin (à ce moment-là, même remède que
+ci-dessus : vrai login, pas une clé partagée collée dans un champ).

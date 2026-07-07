@@ -1,162 +1,141 @@
-# AJV Pay — MVP Backend
+# AJV Pay — Backend fintech
 
-Backend de paiement fintech (monolithe modulaire, NestJS + PostgreSQL), conforme à l'ADR V3
-(MVP construisible par un développeur solo, évolutif vers la vision fintech complète).
+Backend de paiement mobile money (NestJS + PostgreSQL, sans ORM) pour AJV
+Global Holdings — hub central de paiement destiné à être réutilisé par
+plusieurs produits (Mavahi en premier, d'autres à suivre), pas une
+intégration ad hoc par projet.
 
-## Stack
-- Node.js / NestJS
-- PostgreSQL (accès direct via `pg`, pas d'ORM — voir `src/database/database.service.ts`)
-- 3 connectors actifs simultanément, routés par `payment.method` : Flooz, Moov
-  (mobile money, push USSD) et CinetPay (carte bancaire + mobile money
-  multi-opérateurs, par redirection) — voir `src/connectors/connectors.module.ts`
-- Aucune queue externe : pattern Outbox simplifié (table `webhook_attempts` + cron)
+## Stack et architecture
+
+- Node.js / NestJS, PostgreSQL via `pg` direct (voir `src/database/database.service.ts`).
+- Deux processus séparés partageant le même code, déployés comme deux
+  services Railway distincts à partir du même dépôt :
+  - **API** (`src/main.ts`, `npm run start` / `start:prod`) — répond aux
+    requêtes HTTP.
+  - **Worker** (`src/worker.ts`, `npm run start:worker`) — boucle de fond en
+    continu (`@Cron` toutes les 10s) qui traite l'outbox et rattrape toute
+    livraison de webhook marchand qui aurait échoué. L'API elle-même
+    déclenche déjà une livraison immédiate best-effort juste après
+    confirmation d'un paiement — le Worker n'est qu'un filet de sécurité,
+    pas le chemin principal.
+- Trois providers de paiement, routés par `payment.method` (voir
+  `src/connectors/connectors.module.ts`) :
+  - `moov` — Moov Money (Moov Africa, ex-Flooz). Stub générique en attente
+    de credentials marchand réels.
+  - `mixx` — Mixx by Yas (Togocom, ex-T-Money). Stub générique, même
+    remarque.
+  - `manual` — paiement vérifié à la main : le client envoie l'argent
+    lui-même vers un numéro marchand fixe (un par réseau, syntaxe USSD
+    différente pour chacun — voir `ManualPaymentsService`) et soumet son ID
+    de transaction ; un admin plateforme unique (pas un compte par
+    marchand) le confirme ou le rejette depuis une file d'attente
+    centralisée regroupant tous les marchands connectés. Ne dépend
+    d'aucune API tierce, fonctionne dès aujourd'hui.
+- Aucune queue externe : pattern Outbox (table `outbox_events` +
+  `OutboxProcessorService`) qui transforme chaque transition finale de
+  paiement en notification webhook marchand (table `webhook_attempts`,
+  retry avec backoff exponentiel).
 - Durcissement production : rate limiting (`@nestjs/throttler`), headers de
   sécurité (`helmet`), vérification de signature HMAC des webhooks
-  providers, journal d'audit append-only (`audit_logs`) — voir
-  `docs/architecture.md`.
-- Dashboard marchand séparé (React + TypeScript) dans `../dashboard/` — voir
-  `docs/dashboard.md`.
+  providers/manuels, ledger comptable en partie double append-only,
+  idempotence stricte, journal d'audit (`audit_logs`).
+- Dashboard séparé (React + TypeScript) dans `../dashboard/` — voir
+  `docs/dashboard.md`. Deux vues : marchand (paiements, solde, webhook) et
+  admin plateforme (file d'attente des paiements manuels).
 
 ## Installation
 
 ```bash
 npm install
 cp .env.example .env
-# éditer .env : DATABASE_URL, credentials Flooz/Moov, etc.
+# éditer .env : DATABASE_URL, MOOV_*/MIXX_* (credentials en attente),
+# MANUAL_PAYMENT_NUMBER_MOOV/MIXX, ADMIN_API_KEY
 
 npm run migrate     # applique migrations/*.sql dans l'ordre
-node scripts/create-merchant.js "CBK Restaurant" cbk@example.com https://cbk.example.com/webhooks/ajvpay
+
+node scripts/create-merchant.js "Mon Produit" contact@example.com https://mon-produit.example.com/webhooks/ajvpay
 # → conserver l'API Key et le HMAC Secret affichés (non récupérables ensuite)
 
-npm run start:dev
+npm run start:dev   # API en local, avec rechargement à chaud
 ```
 
-## Authentification des requêtes marchand
+Pour lancer le Worker en local (rarement nécessaire en dev — la livraison
+immédiate suffit la plupart du temps) : `npm run build && npm run start:worker`.
 
-Chaque requête doit inclure :
+## Authentification
+
+Deux modèles d'authentification distincts, jamais mélangés :
+
+**Marchand** (routes `/payments/*`, `/merchants/me*`) :
 - `Authorization: Bearer <api_key>`
-- `X-Signature: <hmac_sha256(hmac_secret, JSON.stringify(body))>` (obligatoire pour POST/PUT)
+- `X-Signature: <hmac_sha256(hmac_secret, JSON.stringify(body))>` (obligatoire dès qu'il y a un corps de requête)
 - `Idempotency-Key: <clé unique côté marchand>` (obligatoire pour `POST /payments`)
 
-## Endpoints
+**Admin plateforme** (routes `/admin/manual-payments/*`) :
+- `Authorization: Bearer <ADMIN_API_KEY>` — une seule clé partagée, pas de
+  signature. Un seul admin humain pour l'instant, voit et décide pour tous
+  les marchands connectés.
+
+## Endpoints principaux
 
 ### `POST /payments`
 ```json
 {
   "amount": 5000,
   "currency": "XOF",
-  "method": "flooz",
+  "method": "manual",
   "phoneNumber": "+22890123456",
-  "metadata": { "order_id": "CBK-1234" }
+  "metadata": { "network": "mixx", "order_id": "CBK-1234" }
 }
 ```
+Pour `method: "manual"`, `metadata.network` (`"moov"` ou `"mixx"`) précise
+quel réseau le client va utiliser — c'est une information d'affichage, pas
+une donnée métier séparée en base.
 
 ### `GET /payments/:id`
-Retourne le statut courant du paiement.
+Statut courant du paiement.
 
-### `POST /webhooks/flooz` et `POST /webhooks/moov`
-Endpoints publics recevant les notifications des providers (pas d'auth marchand ici —
-authenticité à vérifier selon le mécanisme propre à chaque provider, voir TODO dans
-`src/connectors/adapters/`).
+### `GET /payments/manual/info`
+Numéro marchand + gabarit de syntaxe USSD pour chacun des deux réseaux
+(`moov`, `mixx`) — à afficher au client, jamais généré côté marchand.
 
-## Points d'intégration restants (TODO explicites dans le code)
+### `POST /payments/:id/submit-proof`
+Le marchand transmet l'ID de transaction que son client lui a communiqué
+(`{ "reference": "...", "note": "..." }`). Ne change pas le statut du
+paiement — reste `processing` jusqu'à la revue admin.
 
-1. **`src/connectors/adapters/flooz.adapter.ts`** et **`moov.adapter.ts`** : les appels HTTP
-   sont désormais réellement implémentés (axios, auth Bearer, mapping de statuts, signature
-   webhook HMAC générique configurable). Ce qui reste à confirmer avec chaque provider à
-   l'onboarding marchand : les chemins d'URL exacts (`FLOOZ_COLLECT_PATH`, etc.), les noms de
-   champs JSON exacts, et le nom réel du header de signature webhook — tout est piloté par
-   `.env`, aucune modification de code ne sera nécessaire une fois ces détails confirmés.
-2. **`src/connectors/adapters/cinetpay.adapter.ts`** : utilise l'API CinetPay publique et
-   documentée (https://docs.cinetpay.com/api/1.0-fr/checkout). Fonctionne par redirection
-   (`redirectUrl` retourné par `POST /payments`, à afficher/rediriger côté marchand) et
-   confirmation systématique par `checkStatus()` après chaque webhook (CinetPay ne garantit
-   pas l'authenticité du contenu de ses notifications HTTP).
-3. **Vérification d'authenticité des webhooks Flooz/Moov** : le mécanisme générique (HMAC-SHA256
-   du corps brut, header configurable via `FLOOZ_WEBHOOK_SIGNATURE_HEADER` /
-   `MOOV_WEBHOOK_SIGNATURE_HEADER`) est implémenté et actif dès que `*_WEBHOOK_SECRET` est
-   configuré. Si Flooz/Moov utilisent un mécanisme différent (header propriétaire, IP
-   whitelist), ajuster `verifyWebhookSignature()` dans l'adapter concerné — `ProviderWebhooksController`
-   journalise explicitement (WARNING + `audit_logs`) tout webhook reçu sans vérification
-   configurée, ce n'est jamais un échec silencieux.
+### `GET /admin/manual-payments/pending` / `POST .../:id/confirm` / `.../:id/reject`
+File d'attente et décision admin (voir plus haut).
 
-## Garanties de correctness financière (non négociables, même au MVP)
+### `POST /webhooks/moov` et `POST /webhooks/mixx`
+Endpoints publics recevant les notifications des providers une fois leurs
+credentials réels obtenus (pas d'auth marchand ici — authenticité vérifiée
+par signature HMAC générique, voir les adapters).
 
-- **Idempotency stricte** : `merchant_id + Idempotency-Key` ne peut jamais créer deux paiements
-  (contrainte UNIQUE en base + vérification applicative avant toute écriture).
-- **Ledger en partie double, append-only** : toute écriture de `ledger_entries` est vérifiée
-  équilibrée avant insertion (`LedgerService.assertBalanced`) ; un trigger PostgreSQL interdit
-  physiquement tout UPDATE/DELETE sur `ledger_entries` et `payment_events`.
-- **Aucune transition de statut silencieuse** : `PaymentsService.transitionStatus` est le seul
-  point d'entrée pour changer le statut d'un paiement, et journalise systématiquement un
-  `payment_event`.
-- **Aucun appel réseau externe dans une transaction SQL ouverte** : les appels au connector et
-  aux webhooks marchand sont toujours faits hors transaction, avec leur état persisté avant et
-  après, pour ne jamais tenir de lock pendant un appel HTTP potentiellement lent.
+### Webhook sortant (vers le marchand)
+`POST <merchant.webhook_url>` avec `{ event, payment_id, merchant_id,
+amount, currency, status, provider_reference, metadata }`, signé
+`X-Signature: hmac_sha256(hmac_secret, JSON.stringify(body))`. `metadata`
+est l'écho exact de ce que le marchand a fourni à la création — c'est ce
+qui lui permet de retrouver sa propre commande sans qu'AJV Pay ait besoin
+de connaître son schéma.
 
-## Architecture interne (mise à jour : PaymentOrchestrator + Outbox formalisé)
+## Garanties de correctness financière
 
-```
-Controller
-   ↓
-PaymentOrchestrator ⭐ (unique point d'entrée logique du cycle de vie)
-   ↓                              ↓
-PaymentsService (state only)   OutboxService.record() (publication de faits)
-   ↓                              ↓
-ConnectorService / LedgerService   OutboxProcessorCron (consumer)
-                                    ↓
-                                 WebhooksService.enqueue() → webhook_attempts → WebhooksCron (delivery + retry)
-```
+- **Idempotency stricte** : `merchant_id + Idempotency-Key` ne peut jamais créer deux paiements.
+- **Ledger en partie double, append-only** : `LedgerService.assertBalanced` avant toute écriture ; trigger PostgreSQL interdisant physiquement tout UPDATE/DELETE sur `ledger_entries` et `payment_events`.
+- **Une seule transaction SQL par transition finale** : `PaymentOrchestrator.commitFinalState` couvre statut + ledger + événement outbox ensemble, ou pas du tout — jamais de paiement `succeeded` sans trace comptable.
+- **Aucun appel réseau externe dans une transaction SQL ouverte** : connector et webhook marchand toujours hors transaction.
 
-`PaymentOrchestrator` ne connaît plus `WebhooksService` : il publie des événements (`payment.succeeded`, `payment.failed`, ...) dans `outbox_events` via `OutboxService`, avec un **snapshot complet** du paiement dans le payload. `OutboxProcessorCron` consomme ces événements et décide d'en faire (ou non) une notification webhook marchand. C'est la même séparation publication/consommation qu'un vrai bus d'événements (SNS/SQS) — seul `OutboxService` change d'implémentation le jour de la bascule vers la vision Future, `PaymentOrchestrator` reste identique.
+## Déploiement (Railway)
 
-## Validation effectuée sans environnement complet (sandbox sans réseau)
+Deux services Railway construits depuis ce même dépôt (monorepo — bien
+régler **Root Directory = `ajv-pay-mvp`** dans les Settings de chaque
+service) :
+- Service API : `npm run start:prod` (migrations + démarrage HTTP).
+- Service Worker : Custom Start Command = `npm run start:worker`.
+- Un service Postgres Railway (ou une base externe compatible via
+  `DATABASE_URL`).
 
-En l'absence d'accès réseau et de PostgreSQL réel, le code a été validé en trois passes
-réelles (pas seulement une relecture) :
-
-1. **Type-check complet** : `npx tsc -p tsconfig.typecheck.json` — vérifie que tout le code
-   de `src/` compile sans erreur, avec des déclarations de types minimales pour les
-   dépendances externes (`typecheck/shims.d.ts`, à supprimer une fois `npm install` exécuté).
-   Plusieurs vrais bugs ont été trouvés et corrigés à cette étape (voir historique) :
-   header HTTP `string | string[]` non géré dans `ApiKeyGuard`, propriété `pool` non
-   définitivement assignée dans `DatabaseService`, propriétés de DTO sans assertion
-   d'assignation définitive.
-
-2. **Smoke test d'exécution réelle** : `npx ts-node typecheck/smoke-test.ts` — exécute pour
-   de vrai (pas juste compile) la logique de `LedgerService` (équilibre des écritures,
-   rejet d'écritures déséquilibrées), `IdempotencyService` (replay vs conflit) et `hmac.util`
-   (signature/comparaison), avec une base PostgreSQL mockée. Ce test s'appuie sur de petits
-   stubs runtime de `@nestjs/common`/`@nestjs/config`/`pg` placés directement dans
-   `node_modules/` (de vrais fichiers `.js` minimaux, pas des mocks de test) pour permettre
-   l'exécution sans `npm install`. **Ces stubs doivent être supprimés avant tout `npm install`
-   réel** (`rm -rf node_modules` puis `npm install`) — ils ne sont là que pour ce diagnostic
-   hors-ligne.
-
-3. **Correction d'atomicité (suite à une revue "Production Hardening Checklist" fintech)** :
-   pour toute transition vers un état final (succeeded/failed/expired/refunded),
-   `PaymentOrchestrator.commitFinalState()` ouvre désormais **une seule transaction SQL**
-   couvrant la mise à jour du statut, l'écriture du ledger et la publication de l'événement
-   outbox. Avant cette correction, ces trois écritures se faisaient dans des transactions
-   séparées — un crash entre deux d'entre elles pouvait laisser un paiement marqué `succeeded`
-   sans aucune trace comptable ni notification, sans aucun moyen de rattraper ça ensuite
-   (l'état final bloque toute nouvelle transition). Vérifié par un test runtime dédié
-   (`typecheck/smoke-test.ts`, section 4) qui confirme qu'une seule transaction couvre bien
-   les quatre écritures (statut, payment_events, ledger_entries, outbox_events).
-
-démarrage effectif du serveur NestJS, exécution des migrations SQL, appels HTTP de bout en
-bout, vrais appels à l'API Flooz/Moov.
-
-## Trajectoire vers la vision Future (ADR V2)
-
-
-Cette base est volontairement structurée pour permettre la bascule décrite dans l'ADR V3 sans
-réécriture :
-- Le contrat `PaymentProviderAdapter` permet d'ajouter un deuxième provider en ajoutant un seul
-  fichier adapter, sans toucher à `PaymentsService`.
-- Le pattern Outbox est désormais un vrai composant (`OutboxService` + `OutboxProcessorCron`,
-  table `outbox_events`), pas une logique enfouie dans `WebhooksService`. Remplacer la
-  persistance SQL par un `publish()` SNS dans `OutboxService` suffira à migrer vers la vision
-  Future, sans toucher à `PaymentOrchestrator` ni à `WebhooksService`.
-- `LedgerService` est déjà conçu comme un module isolé : son extraction en service réseau séparé
-  (vision Future) ne nécessite pas de changer son modèle de données.
+Le dashboard (`../dashboard/`) se déploie séparément (Vercel/Netlify) — voir
+`docs/dashboard.md`.

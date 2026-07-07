@@ -1,3 +1,8 @@
+# Config par défaut du dépôt — s'applique au service "API". Le service
+# "Worker" (même dépôt, même build) doit surcharger startCommand via son
+# propre "Custom Start Command" dans les Settings Railway du service
+# (`npm run start:worker`) : Railway ne permet pas de définir plusieurs
+# commandes de démarrage par service dans un seul railway.toml.
 [build]
 builder = "nixpacks"
 
