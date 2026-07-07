@@ -50,91 +50,78 @@ export function AdminDashboard({
   }
 
   return (
-    <div style={{ fontFamily: 'sans-serif', maxWidth: 900, margin: '0 auto', padding: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>AJV Pay — Admin plateforme</h1>
-        <button onClick={onLogout} style={{ cursor: 'pointer' }}>
+    <div className="page">
+      <div className="header-row">
+        <h1 className="brand-title">
+          AJV <span>Pay</span> — Admin
+        </h1>
+        <button onClick={onLogout} className="btn btn-secondary btn-sm">
           Déconnexion
         </button>
       </div>
 
-      {error && <p style={{ color: '#dc2626' }}>Erreur : {error}</p>}
+      {error && <p className="error-banner">Erreur : {error}</p>}
 
-      <h2>Paiements manuels en attente ({pending.length})</h2>
+      <h2 className="section-title">Paiements manuels en attente ({pending.length})</h2>
 
-      {pending.length === 0 && <p style={{ color: '#666' }}>Aucun paiement en attente de vérification.</p>}
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {pending.map((p) => {
-          const network = p.metadata?.network;
-          return (
-            <div key={p.id} style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                <div>
-                  <strong>{p.merchant_name}</strong> — {Number(p.amount).toLocaleString('fr-FR')} {p.currency}
-                  {network && (
-                    <span style={{ marginLeft: 8, color: '#666' }}>({NETWORK_LABELS[network] ?? network})</span>
-                  )}
+      {pending.length === 0 ? (
+        <div className="card">
+          <p className="empty-state">Aucun paiement en attente de vérification.</p>
+        </div>
+      ) : (
+        <div className="stack">
+          {pending.map((p) => {
+            const network = p.metadata?.network;
+            return (
+              <div key={p.id} className="card">
+                <div className="payment-card-top">
+                  <div>
+                    <span className="payment-amount">
+                      {Number(p.amount).toLocaleString('fr-FR')} {p.currency}
+                    </span>{' '}
+                    <strong>— {p.merchant_name}</strong>
+                    {network && <span className="badge badge-processing" style={{ marginLeft: 8 }}>{NETWORK_LABELS[network] ?? network}</span>}
+                  </div>
+                  <span className="payment-meta">{new Date(p.created_at).toLocaleString('fr-FR')}</span>
                 </div>
-                <span style={{ color: '#666', fontSize: 13 }}>{new Date(p.created_at).toLocaleString('fr-FR')}</span>
-              </div>
-              <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>Téléphone : {p.phone_number ?? '—'}</div>
+                <div className="payment-meta">Téléphone : {p.phone_number ?? '—'}</div>
 
-              <div style={{ marginTop: 12 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
-                  Références soumises ({p.proofs.length}) :
-                </div>
+                <div className="proof-heading">Références soumises ({p.proofs.length})</div>
                 {p.proofs.length === 0 ? (
-                  <p style={{ fontSize: 13, color: '#999' }}>Aucune référence soumise pour l'instant.</p>
+                  <p className="payment-meta">Aucune référence soumise pour l'instant.</p>
                 ) : (
-                  <ul style={{ margin: 0, paddingLeft: 20 }}>
+                  <ul className="proof-list">
                     {p.proofs.map((proof) => (
-                      <li key={proof.id} style={{ fontSize: 13 }}>
+                      <li key={proof.id}>
                         <code>{proof.submitted_reference}</code>
-                        {proof.note && <span style={{ color: '#666' }}> — {proof.note}</span>}
-                        <span style={{ color: '#999' }}> ({new Date(proof.created_at).toLocaleString('fr-FR')})</span>
+                        {proof.note && <span className="payment-meta"> — {proof.note}</span>}
+                        <span className="payment-meta"> ({new Date(proof.created_at).toLocaleString('fr-FR')})</span>
                       </li>
                     ))}
                   </ul>
                 )}
-              </div>
 
-              <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-                <button
-                  onClick={() => handleDecision(p.id, 'confirm')}
-                  disabled={busyId === p.id}
-                  style={{
-                    padding: '6px 14px',
-                    cursor: busyId === p.id ? 'not-allowed' : 'pointer',
-                    background: '#16a34a',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 4,
-                    opacity: busyId === p.id ? 0.6 : 1,
-                  }}
-                >
-                  {busyId === p.id ? '…' : 'Confirmer'}
-                </button>
-                <button
-                  onClick={() => handleDecision(p.id, 'reject')}
-                  disabled={busyId === p.id}
-                  style={{
-                    padding: '6px 14px',
-                    cursor: busyId === p.id ? 'not-allowed' : 'pointer',
-                    background: '#dc2626',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 4,
-                    opacity: busyId === p.id ? 0.6 : 1,
-                  }}
-                >
-                  {busyId === p.id ? '…' : 'Rejeter'}
-                </button>
+                <div className="actions-row">
+                  <button
+                    onClick={() => handleDecision(p.id, 'confirm')}
+                    disabled={busyId === p.id}
+                    className="btn btn-success btn-sm"
+                  >
+                    {busyId === p.id ? '…' : 'Confirmer'}
+                  </button>
+                  <button
+                    onClick={() => handleDecision(p.id, 'reject')}
+                    disabled={busyId === p.id}
+                    className="btn btn-danger btn-sm"
+                  >
+                    {busyId === p.id ? '…' : 'Rejeter'}
+                  </button>
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

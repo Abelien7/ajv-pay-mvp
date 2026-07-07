@@ -1,4 +1,4 @@
-import { CSSProperties, FormEvent, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import type { Credentials } from './types';
 
 export function LoginForm({
@@ -18,49 +18,40 @@ export function LoginForm({
   }
 
   return (
-    <div style={{ maxWidth: 420, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>AJV Pay — Dashboard marchand</h1>
-      <p style={{ color: '#555', fontSize: 14 }}>
-        Connecte-toi avec les identifiants reçus à la création de ton compte
-        marchand (<code>scripts/create-merchant.js</code>).
+    <div className="auth-page">
+      <p className="eyebrow">AJV Pay</p>
+      <h1 className="brand-title">Dashboard marchand</h1>
+      <p className="subtitle">
+        Connecte-toi avec les identifiants reçus à la création de ton compte marchand (
+        <code>scripts/create-merchant.js</code>).
       </p>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <label>
+      <form onSubmit={handleSubmit} className="form-stack">
+        <label className="field">
           URL de l'API
-          <input value={apiBaseUrl} onChange={(e) => setApiBaseUrl(e.target.value)} style={inputStyle} />
+          <input value={apiBaseUrl} onChange={(e) => setApiBaseUrl(e.target.value)} />
         </label>
-        <label>
+        <label className="field">
           API Key
-          <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} style={inputStyle} required />
+          <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} required />
         </label>
-        <label>
+        <label className="field">
           HMAC Secret
           <input
             type="password"
             value={hmacSecret}
             onChange={(e) => setHmacSecret(e.target.value)}
-            style={inputStyle}
             required
           />
         </label>
-        <button type="submit" style={{ padding: '10px 16px', cursor: 'pointer' }}>
+        <button type="submit" className="btn btn-primary">
           Se connecter
         </button>
       </form>
-      <button
-        onClick={onAdminClick}
-        style={{ marginTop: 16, background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: 0 }}
-      >
-        Vous êtes l'admin plateforme ? →
-      </button>
+      <div className="link-row">
+        <button onClick={onAdminClick} className="btn btn-ghost">
+          Vous êtes l'admin plateforme ? →
+        </button>
+      </div>
     </div>
   );
 }
-
-const inputStyle: CSSProperties = {
-  display: 'block',
-  width: '100%',
-  padding: 8,
-  marginTop: 4,
-  boxSizing: 'border-box',
-};

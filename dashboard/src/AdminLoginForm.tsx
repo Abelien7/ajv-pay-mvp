@@ -1,4 +1,4 @@
-import { CSSProperties, FormEvent, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import type { AdminCredentials } from './types';
 
 export function AdminLoginForm({
@@ -17,44 +17,30 @@ export function AdminLoginForm({
   }
 
   return (
-    <div style={{ maxWidth: 420, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>AJV Pay — Admin plateforme</h1>
-      <p style={{ color: '#555', fontSize: 14 }}>
+    <div className="auth-page">
+      <p className="eyebrow">AJV Pay</p>
+      <h1 className="brand-title">Admin plateforme</h1>
+      <p className="subtitle">
         File d'attente centralisée des paiements manuels de tous les marchands connectés.
       </p>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <label>
+      <form onSubmit={handleSubmit} className="form-stack">
+        <label className="field">
           URL de l'API
-          <input value={apiBaseUrl} onChange={(e) => setApiBaseUrl(e.target.value)} style={inputStyle} />
+          <input value={apiBaseUrl} onChange={(e) => setApiBaseUrl(e.target.value)} />
         </label>
-        <label>
+        <label className="field">
           Clé admin
-          <input
-            type="password"
-            value={adminKey}
-            onChange={(e) => setAdminKey(e.target.value)}
-            style={inputStyle}
-            required
-          />
+          <input type="password" value={adminKey} onChange={(e) => setAdminKey(e.target.value)} required />
         </label>
-        <button type="submit" style={{ padding: '10px 16px', cursor: 'pointer' }}>
+        <button type="submit" className="btn btn-primary">
           Se connecter
         </button>
       </form>
-      <button
-        onClick={onBack}
-        style={{ marginTop: 16, background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: 0 }}
-      >
-        ← Retour à l'espace marchand
-      </button>
+      <div className="link-row">
+        <button onClick={onBack} className="btn btn-ghost">
+          ← Retour à l'espace marchand
+        </button>
+      </div>
     </div>
   );
 }
-
-const inputStyle: CSSProperties = {
-  display: 'block',
-  width: '100%',
-  padding: 8,
-  marginTop: 4,
-  boxSizing: 'border-box',
-};
