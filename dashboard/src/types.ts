@@ -34,3 +34,30 @@ export interface Credentials {
   apiKey: string;
   hmacSecret: string;
 }
+
+export interface AdminCredentials {
+  apiBaseUrl: string;
+  adminKey: string;
+}
+
+export interface ManualPaymentProof {
+  id: string;
+  submitted_reference: string;
+  note: string | null;
+  created_at: string;
+}
+
+export interface PendingManualPayment {
+  id: string;
+  merchant_id: string;
+  merchant_name: string;
+  // Renvoyé en chaîne par Postgres (bigint) — jamais un number côté API.
+  amount: string;
+  currency: string;
+  method: string;
+  status: string;
+  phone_number: string | null;
+  metadata: { network?: 'moov' | 'mixx'; [key: string]: unknown } | null;
+  created_at: string;
+  proofs: ManualPaymentProof[];
+}

@@ -1,28 +1,26 @@
 import { CSSProperties, FormEvent, useState } from 'react';
-import type { Credentials } from './types';
+import type { AdminCredentials } from './types';
 
-export function LoginForm({
+export function AdminLoginForm({
   onSubmit,
-  onAdminClick,
+  onBack,
 }: {
-  onSubmit: (creds: Credentials) => void;
-  onAdminClick: () => void;
+  onSubmit: (creds: AdminCredentials) => void;
+  onBack: () => void;
 }) {
   const [apiBaseUrl, setApiBaseUrl] = useState(import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000');
-  const [apiKey, setApiKey] = useState('');
-  const [hmacSecret, setHmacSecret] = useState('');
+  const [adminKey, setAdminKey] = useState('');
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    onSubmit({ apiBaseUrl, apiKey, hmacSecret });
+    onSubmit({ apiBaseUrl, adminKey });
   }
 
   return (
     <div style={{ maxWidth: 420, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>AJV Pay — Dashboard marchand</h1>
+      <h1>AJV Pay — Admin plateforme</h1>
       <p style={{ color: '#555', fontSize: 14 }}>
-        Connecte-toi avec les identifiants reçus à la création de ton compte
-        marchand (<code>scripts/create-merchant.js</code>).
+        File d'attente centralisée des paiements manuels de tous les marchands connectés.
       </p>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <label>
@@ -30,15 +28,11 @@ export function LoginForm({
           <input value={apiBaseUrl} onChange={(e) => setApiBaseUrl(e.target.value)} style={inputStyle} />
         </label>
         <label>
-          API Key
-          <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} style={inputStyle} required />
-        </label>
-        <label>
-          HMAC Secret
+          Clé admin
           <input
             type="password"
-            value={hmacSecret}
-            onChange={(e) => setHmacSecret(e.target.value)}
+            value={adminKey}
+            onChange={(e) => setAdminKey(e.target.value)}
             style={inputStyle}
             required
           />
@@ -48,10 +42,10 @@ export function LoginForm({
         </button>
       </form>
       <button
-        onClick={onAdminClick}
+        onClick={onBack}
         style={{ marginTop: 16, background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: 0 }}
       >
-        Vous êtes l'admin plateforme ? →
+        ← Retour à l'espace marchand
       </button>
     </div>
   );
