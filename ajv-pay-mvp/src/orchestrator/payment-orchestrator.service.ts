@@ -5,6 +5,8 @@ import { ConnectorService } from '../connectors/connector.service';
 import { ProviderName } from '../connectors/connector.interface';
 import { LedgerService, providerLedgerAccount } from '../ledger/ledger.service';
 import { OutboxService, OutboxEventType } from '../outbox/outbox.service';
+import { OutboxProcessorService } from '../outbox/outbox-processor.service';
+import { WebhooksService } from '../webhooks/webhooks.service';
 import { CreatePaymentDto } from '../payments/dto/create-payment.dto';
 import { Payment, PaymentStatus } from '../payments/payment.entity';
 
@@ -33,6 +35,15 @@ import { Payment, PaymentStatus } from '../payments/payment.entity';
  * hors transaction — c'est la seule étape qui implique un appel externe,
  * et son résultat est connu avant l'ouverture de la transaction qui
  * commitera ses conséquences.
+ *
+ * MISE À JOUR (séparation API / Worker, chacun un service Railway distinct
+ * déployé depuis ce même dépôt) : après le commit d'une transition finale
+ * notifiable, la livraison du webhook marchand est déclenchée IMMÉDIATEMENT
+ * ici (best-effort, hors transaction) plutôt que d'attendre le prochain
+ * tick du process Worker — voir `deliverPendingWebhooksBestEffort()`. Le
+ * Worker (voir worker.ts/WorkerCronService, `@Cron` en continu) reste le
+ * filet de sécurité pour les rares cas où cette tentative immédiate
+ * échouerait elle-même (ex: endpoint marchand temporairement injoignable).
  */
 @Injectable()
 export class PaymentOrchestrator {
@@ -44,6 +55,8 @@ export class PaymentOrchestrator {
     private readonly connector: ConnectorService,
     private readonly ledger: LedgerService,
     private readonly outbox: OutboxService,
+    private readonly outboxProcessor: OutboxProcessorService,
+    private readonly webhooksDelivery: WebhooksService,
   ) {}
 
   /**
@@ -196,7 +209,9 @@ export class PaymentOrchestrator {
     providerReference?: string,
     redirectUrl?: string,
   ): Promise<Payment> {
-    return this.db.withTransaction(async (client) => {
+    let transitionApplied = false;
+
+    const result = await this.db.withTransaction(async (client) => {
       const updated = await this.payments.applyFinalTransition(
         client,
         paymentId,
@@ -243,10 +258,33 @@ export class PaymentOrchestrator {
           this.snapshot(updated),
           { paymentId: updated.id, merchantId: updated.merchant_id },
         );
+        transitionApplied = true;
       }
 
       return updated;
     });
+
+    // Hors transaction, APRÈS le commit : le webhook marchand implique un
+    // appel réseau externe, qui ne doit jamais faire partie d'une
+    // transaction SQL. Best-effort — un échec ici est rattrapé par le
+    // prochain tick du service Worker, jamais silencieusement perdu (voir
+    // OutboxService : l'événement reste non marqué "processed").
+    if (transitionApplied) {
+      await this.deliverPendingWebhooksBestEffort();
+    }
+
+    return result;
+  }
+
+  private async deliverPendingWebhooksBestEffort(): Promise<void> {
+    try {
+      await this.outboxProcessor.processOutbox();
+      await this.webhooksDelivery.processDue();
+    } catch (err: any) {
+      this.logger.warn(
+        `Livraison webhook immédiate best-effort échouée (rattrapée par le service Worker): ${err.message}`,
+      );
+    }
   }
 
   /**

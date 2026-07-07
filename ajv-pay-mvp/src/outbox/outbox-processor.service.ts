@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { OutboxService, OutboxEventRow } from './outbox.service';
 import { WebhooksService } from '../webhooks/webhooks.service';
 import { Payment } from '../payments/payment.entity';
@@ -12,13 +11,15 @@ import { Payment } from '../payments/payment.entity';
  * notification — le marchand n'a pas besoin d'un webhook pour un état
  * transitoire qu'il connaît déjà (il vient de faire l'appel `POST /payments`).
  *
- * Le payload de chaque événement contient déjà tout ce qu'il faut (snapshot
- * du paiement écrit par PaymentOrchestrator) — ce processor ne relit jamais
- * `payments`, exactement comme le ferait un vrai consumer SNS/SQS.
+ * Pas de `@Cron` ici : `processOutbox()` est appelée de deux façons — juste
+ * après qu'un paiement change de statut (PaymentOrchestrator, dans le
+ * process API, livraison quasi immédiate) et en continu par
+ * `WorkerCronService` (process Worker, service Railway séparé — filet de
+ * sécurité pour tout ce qui aurait échoué au premier passage).
  */
 @Injectable()
-export class OutboxProcessorCron {
-  private readonly logger = new Logger(OutboxProcessorCron.name);
+export class OutboxProcessorService {
+  private readonly logger = new Logger(OutboxProcessorService.name);
 
   private readonly notifiableEvents = new Set([
     'payment.succeeded',
@@ -32,7 +33,6 @@ export class OutboxProcessorCron {
     private readonly webhooks: WebhooksService,
   ) {}
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
   async processOutbox(): Promise<void> {
     const events = await this.outbox.listUnprocessed();
 
@@ -42,8 +42,9 @@ export class OutboxProcessorCron {
         await this.outbox.markProcessed(event.id);
       } catch (err: any) {
         // On NE marque PAS l'événement comme traité en cas d'erreur : il
-        // sera retenté au prochain passage du cron. Pas d'échec silencieux,
-        // pas de perte d'événement.
+        // sera retenté au prochain appel (livraison immédiate suivante ou
+        // prochain tick du Worker). Pas d'échec silencieux, pas de perte
+        // d'événement.
         this.logger.error(`Échec traitement outbox event=${event.id}: ${err.message}`);
       }
     }

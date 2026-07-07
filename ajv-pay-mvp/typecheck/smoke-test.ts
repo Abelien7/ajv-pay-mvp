@@ -236,12 +236,18 @@ async function main() {
     const paymentsService = new PaymentsService(fakeDb, {} as any, new PaymentEventsService());
     const ledgerService = new LedgerService(fakeDb);
     const outboxService = new OutboxService(fakeDb);
+    // Livraison webhook immédiate désactivée pour ce test (best-effort, ne
+    // doit pas faire échouer la vérification de l'atomicité statut/ledger/outbox).
+    const fakeOutboxProcessor: any = { processOutbox: async () => {} };
+    const fakeWebhooksDelivery: any = { processDue: async () => {} };
     const orchestrator = new PaymentOrchestrator(
       fakeDb,
       paymentsService,
       fakeConnector,
       ledgerService,
       outboxService,
+      fakeOutboxProcessor,
+      fakeWebhooksDelivery,
     );
 
     await orchestrator.handleProviderWebhook('mixx', { transaction_id: 'mixx-ref-1', status: 'SUCCESS' });

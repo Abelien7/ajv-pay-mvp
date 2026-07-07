@@ -1,7 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ScheduleModule } from '@nestjs/schedule';
 import { WebhooksService } from './webhooks.service';
-import { WebhooksCron } from './webhooks.cron';
 import { MerchantsModule } from '../merchants/merchants.module';
 
 /**
@@ -9,10 +7,17 @@ import { MerchantsModule } from '../merchants/merchants.module';
  * marchands). Les webhooks entrants des providers (Moov/Mixx) sont reçus
  * par ProviderWebhooksController, déclaré dans PaymentsModule, pour éviter
  * une dépendance circulaire (ce controller a besoin de PaymentsService).
+ *
+ * Pas de `@Cron` ici : ce module est partagé par le process API (main.ts —
+ * livraison immédiate best-effort juste après une transition de statut,
+ * voir PaymentOrchestrator) et par le process Worker (worker.ts, service
+ * Railway séparé — voir WorkerCronService, seul endroit du système avec un
+ * `@Cron` en continu, filet de sécurité qui rattrape ce que la livraison
+ * immédiate aurait manqué).
  */
 @Module({
-  imports: [ScheduleModule, MerchantsModule],
-  providers: [WebhooksService, WebhooksCron],
+  imports: [MerchantsModule],
+  providers: [WebhooksService],
   exports: [WebhooksService],
 })
 export class WebhooksModule {}

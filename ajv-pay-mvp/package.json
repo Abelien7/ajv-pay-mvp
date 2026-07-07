@@ -5,8 +5,9 @@
   "private": true,
   "scripts": {
     "build": "nest build",
-    "start": "node dist/main.js",
-    "start:prod": "node scripts/migrate.js && node dist/main.js",
+    "start": "node dist/src/main.js",
+    "start:prod": "node scripts/migrate.js && node dist/src/main.js",
+    "start:worker": "node dist/src/worker.js",
     "start:dev": "nest start --watch",
     "migrate": "node scripts/migrate.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",

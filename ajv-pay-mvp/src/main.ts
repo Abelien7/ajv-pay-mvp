@@ -4,6 +4,12 @@ import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
+/**
+ * Point d'entrée du service Railway "API" (répond aux requêtes HTTP) —
+ * distinct du service "Worker" (voir worker.ts, boucle de fond en continu,
+ * pas de serveur HTTP), déployé depuis ce même dépôt comme un second
+ * service Railway.
+ */
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
