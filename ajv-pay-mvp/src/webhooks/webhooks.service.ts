@@ -66,6 +66,10 @@ export class WebhooksService {
       currency: payment.currency,
       status: payment.status,
       provider_reference: payment.provider_reference,
+      // Echo de ce que le marchand a fourni dans `metadata` à la création
+      // du paiement (POST /payments) — lui permet de retrouver sa propre
+      // commande sans qu'AJV Pay ait besoin de connaître son schéma.
+      metadata: payment.metadata,
     };
 
     await this.db.query(

@@ -313,6 +313,12 @@ export class PaymentOrchestrator {
       method: payment.method,
       status: payment.status,
       provider_reference: payment.provider_reference,
+      // Transmis jusqu'au webhook marchand (voir WebhooksService.enqueue) —
+      // c'est ce qui permet à un marchand comme Mavahi de retrouver sa
+      // propre commande sans qu'AJV Pay ait besoin de connaître son schéma
+      // (il suffit de passer sa propre référence dans `metadata` à la
+      // création du paiement, POST /payments).
+      metadata: payment.metadata,
     };
   }
 }
