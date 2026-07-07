@@ -1,14 +1,15 @@
-# Config par défaut du dépôt — s'applique au service "API". Le service
-# "Worker" (même dépôt, même build) doit surcharger startCommand via son
-# propre "Custom Start Command" dans les Settings Railway du service
-# (`npm run start:worker`) : Railway ne permet pas de définir plusieurs
-# commandes de démarrage par service dans un seul railway.toml.
+# Ce dépôt héberge 2 services Railway (API + Worker) qui partagent ce
+# même build. startCommand et healthcheckPath ne sont PAS définis ici :
+# le Worker n'a pas de serveur HTTP, donc un healthcheck partagé casserait
+# son déploiement. Chaque service doit régler ça séparément dans son
+# dashboard Railway (Settings > Deploy) :
+#   - API (ajv-pay-mvp) : Custom Start Command = "npm run start:prod",
+#     Healthcheck Path = "/health"
+#   - Worker (lucky-miracle) : Custom Start Command = "npm run start:worker",
+#     pas de Healthcheck Path
 [build]
 builder = "nixpacks"
 
 [deploy]
-startCommand = "npm run start:prod"
-healthcheckPath = "/health"
-healthcheckTimeout = 30
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
