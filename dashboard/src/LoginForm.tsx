@@ -3,11 +3,9 @@ import { dashboardApi, DashboardApiError } from './dashboardApi';
 
 export function LoginForm({
   onSuccess,
-  onAdminClick,
   onSignupClick,
 }: {
   onSuccess: (session: { id: string; name: string }) => void;
-  onAdminClick: () => void;
   onSignupClick: () => void;
 }) {
   const [email, setEmail] = useState('');
@@ -57,11 +55,6 @@ export function LoginForm({
         <div className="link-row">
           <button onClick={onSignupClick} className="btn btn-ghost">
             Pas encore de compte ? Créer un compte marchand →
-          </button>
-        </div>
-        <div className="link-row">
-          <button onClick={onAdminClick} className="btn btn-ghost">
-            Vous êtes l'admin plateforme ? →
           </button>
         </div>
       </div>

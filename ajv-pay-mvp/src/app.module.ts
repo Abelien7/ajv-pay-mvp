@@ -10,6 +10,7 @@ import { OutboxModule } from './outbox/outbox.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { DashboardAuthModule } from './dashboard-auth/dashboard-auth.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { SiteContentModule } from './site-content/site-content.module';
 import { HealthController } from './health.controller';
 
 /**
@@ -39,6 +40,7 @@ import { HealthController } from './health.controller';
     WebhooksModule,
     DashboardAuthModule,
     DashboardModule,
+    SiteContentModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

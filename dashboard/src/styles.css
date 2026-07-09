@@ -396,6 +396,31 @@ table.payments-table tr:last-child td {
   gap: 16px;
 }
 
+.content-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+.content-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 10px 4px;
+  margin-right: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.content-tab:hover {
+  color: var(--ink);
+}
+.content-tab-active {
+  color: var(--brand-600);
+  border-bottom-color: var(--brand-600);
+}
+
 .payment-card-top {
   display: flex;
   justify-content: space-between;
@@ -643,14 +668,84 @@ table.payments-table tr:last-child td {
   font-size: 14.5px;
 }
 
+/* ---------- Bandeau de preuve (après le hero) ---------- */
+.proof-strip {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 40px 24px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.proof-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--brand-600);
+}
+.proof-label {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  line-height: 1.4;
+}
+
+/* ---------- Footer riche ---------- */
 .site-footer {
   max-width: 1080px;
   margin: 0 auto;
-  padding: 28px 24px 48px;
+  padding: 56px 24px 32px;
+}
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 1fr;
+  gap: 32px;
+  padding-bottom: 32px;
+}
+.footer-brand-col p {
+  margin: 12px 0 0;
+  font-size: 13.5px;
+  color: var(--ink-muted);
+  max-width: 30ch;
+}
+.footer-col h4 {
+  font-family: var(--font-head);
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-muted);
+  margin: 0 0 14px;
+}
+.footer-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.footer-col a,
+.footer-link-btn {
+  font-size: 14px;
+  color: var(--ink);
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.footer-col a:hover,
+.footer-link-btn:hover {
+  color: var(--brand-600);
+}
+.footer-bottom {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
   color: var(--ink-muted);
 }
 
@@ -659,6 +754,12 @@ table.payments-table tr:last-child td {
   .methods-grid,
   .trust-grid {
     grid-template-columns: 1fr;
+  }
+  .proof-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
   }
   .nav-links {
     gap: 12px;

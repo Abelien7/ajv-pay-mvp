@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from './adminApi';
+import { AdminContentPanel } from './AdminContentPanel';
 import type { AdminCredentials, PendingManualPayment } from './types';
 
 const NETWORK_LABELS: Record<string, string> = { moov: 'Moov Money', mixx: 'Mixx by Yas' };
@@ -11,6 +12,7 @@ export function AdminDashboard({
   credentials: AdminCredentials;
   onLogout: () => void;
 }) {
+  const [tab, setTab] = useState<'payments' | 'content'>('payments');
   const [pending, setPending] = useState<PendingManualPayment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -60,17 +62,36 @@ export function AdminDashboard({
         </button>
       </div>
 
-      {error && <p className="error-banner">Erreur : {error}</p>}
+      <div className="content-tabs">
+        <button
+          className={`content-tab ${tab === 'payments' ? 'content-tab-active' : ''}`}
+          onClick={() => setTab('payments')}
+        >
+          Paiements à vérifier
+        </button>
+        <button
+          className={`content-tab ${tab === 'content' ? 'content-tab-active' : ''}`}
+          onClick={() => setTab('content')}
+        >
+          Contenu du site
+        </button>
+      </div>
 
-      <h2 className="section-title">Paiements manuels en attente ({pending.length})</h2>
-
-      {pending.length === 0 ? (
-        <div className="card">
-          <p className="empty-state">Aucun paiement en attente de vérification.</p>
-        </div>
+      {tab === 'content' ? (
+        <AdminContentPanel credentials={credentials} />
       ) : (
-        <div className="stack">
-          {pending.map((p) => {
+        <>
+          {error && <p className="error-banner">Erreur : {error}</p>}
+
+          <h2 className="section-title">Paiements manuels en attente ({pending.length})</h2>
+
+          {pending.length === 0 ? (
+            <div className="card">
+              <p className="empty-state">Aucun paiement en attente de vérification.</p>
+            </div>
+          ) : (
+            <div className="stack">
+              {pending.map((p) => {
             const network = p.metadata?.network;
             return (
               <div key={p.id} className="card">
@@ -118,9 +139,11 @@ export function AdminDashboard({
                   </button>
                 </div>
               </div>
-            );
-          })}
-        </div>
+              );
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

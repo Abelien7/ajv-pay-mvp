@@ -1,4 +1,9 @@
-import type { AdminCredentials, PendingManualPayment } from './types';
+import type {
+  AdminCredentials,
+  ListItem,
+  NewsPost,
+  PendingManualPayment,
+} from './types';
 
 /**
  * Auth admin distincte du client marchand (`api.ts`) : une simple clé
@@ -9,18 +14,36 @@ import type { AdminCredentials, PendingManualPayment } from './types';
 async function adminRequest<T>(
   creds: AdminCredentials,
   path: string,
-  options: { method?: string } = {},
+  options: { method?: string; body?: unknown } = {},
 ): Promise<T> {
   const method = options.method ?? 'GET';
+  const headers: Record<string, string> = { Authorization: `Bearer ${creds.adminKey}` };
+  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+
   const response = await fetch(`${creds.apiBaseUrl}${path}`, {
     method,
-    headers: { Authorization: `Bearer ${creds.adminKey}` },
+    headers,
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
   if (!response.ok) {
     const text = await response.text();
     throw new Error(`${response.status} ${response.statusText}: ${text}`);
   }
   return response.json() as Promise<T>;
+}
+
+/** Payload partagé par les pays couverts et les réseaux de paiement (même forme côté backend). */
+export interface ListItemPayload {
+  name?: string;
+  isActive?: boolean;
+  displayOrder?: number;
+}
+
+export interface NewsPostPayload {
+  title?: string;
+  body?: string;
+  imageUrl?: string;
+  isPublished?: boolean;
 }
 
 export const adminApi = {
@@ -32,4 +55,43 @@ export const adminApi = {
 
   reject: (creds: AdminCredentials, paymentId: string) =>
     adminRequest(creds, `/admin/manual-payments/${paymentId}/reject`, { method: 'POST' }),
+
+  // ----- Contenu du site : actualités -----
+
+  listNews: (creds: AdminCredentials) => adminRequest<NewsPost[]>(creds, '/admin/site-content/news'),
+
+  createNews: (creds: AdminCredentials, payload: NewsPostPayload) =>
+    adminRequest<NewsPost>(creds, '/admin/site-content/news', { method: 'POST', body: payload }),
+
+  updateNews: (creds: AdminCredentials, id: string, payload: NewsPostPayload) =>
+    adminRequest<NewsPost>(creds, `/admin/site-content/news/${id}`, { method: 'PATCH', body: payload }),
+
+  deleteNews: (creds: AdminCredentials, id: string) =>
+    adminRequest(creds, `/admin/site-content/news/${id}`, { method: 'DELETE' }),
+
+  // ----- Contenu du site : pays couverts -----
+
+  listCountries: (creds: AdminCredentials) => adminRequest<ListItem[]>(creds, '/admin/site-content/countries'),
+
+  createCountry: (creds: AdminCredentials, payload: ListItemPayload) =>
+    adminRequest<ListItem>(creds, '/admin/site-content/countries', { method: 'POST', body: payload }),
+
+  updateCountry: (creds: AdminCredentials, id: string, payload: ListItemPayload) =>
+    adminRequest<ListItem>(creds, `/admin/site-content/countries/${id}`, { method: 'PATCH', body: payload }),
+
+  deleteCountry: (creds: AdminCredentials, id: string) =>
+    adminRequest(creds, `/admin/site-content/countries/${id}`, { method: 'DELETE' }),
+
+  // ----- Contenu du site : réseaux de paiement -----
+
+  listNetworks: (creds: AdminCredentials) => adminRequest<ListItem[]>(creds, '/admin/site-content/networks'),
+
+  createNetwork: (creds: AdminCredentials, payload: ListItemPayload) =>
+    adminRequest<ListItem>(creds, '/admin/site-content/networks', { method: 'POST', body: payload }),
+
+  updateNetwork: (creds: AdminCredentials, id: string, payload: ListItemPayload) =>
+    adminRequest<ListItem>(creds, `/admin/site-content/networks/${id}`, { method: 'PATCH', body: payload }),
+
+  deleteNetwork: (creds: AdminCredentials, id: string) =>
+    adminRequest(creds, `/admin/site-content/networks/${id}`, { method: 'DELETE' }),
 };

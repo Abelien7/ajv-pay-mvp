@@ -68,3 +68,23 @@ export interface PendingManualPayment {
   created_at: string;
   proofs: ManualPaymentProof[];
 }
+
+export interface NewsPost {
+  id: string;
+  title: string;
+  body: string;
+  image_url: string | null;
+  is_published: boolean;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Forme commune aux pays couverts et réseaux de paiement (voir SiteContentService, backend). */
+export interface ListItem {
+  id: string;
+  name: string;
+  is_active: boolean;
+  display_order: number;
+  created_at: string;
+}

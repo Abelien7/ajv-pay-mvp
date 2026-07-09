@@ -10,10 +10,18 @@ import { useAdminCredentials } from './useAdminCredentials';
 
 type Mode = 'landing' | 'login' | 'signup' | 'admin';
 
+/**
+ * Aucun lien public ne mène ici (voir Landing.tsx/LoginForm.tsx) — seul
+ * l'utilisateur connaît cette URL directe. Ce n'est pas un vrai secret (une
+ * URL reste visible dans l'historique du navigateur), la vraie protection
+ * reste la clé admin ; ça retire juste le lien de l'interface publique.
+ */
+const isAdminPath = window.location.pathname === '/admin';
+
 export default function App() {
   const { session, checking, setSession, clearSession } = useSession();
   const { adminCredentials, setAdminCredentials, clearAdminCredentials } = useAdminCredentials();
-  const [mode, setMode] = useState<Mode>(adminCredentials ? 'admin' : 'landing');
+  const [mode, setMode] = useState<Mode>(adminCredentials || isAdminPath ? 'admin' : 'landing');
 
   if (mode === 'admin') {
     if (!adminCredentials) {
@@ -53,20 +61,8 @@ export default function App() {
   }
 
   if (mode === 'login') {
-    return (
-      <LoginForm
-        onSuccess={setSession}
-        onAdminClick={() => setMode('admin')}
-        onSignupClick={() => setMode('signup')}
-      />
-    );
+    return <LoginForm onSuccess={setSession} onSignupClick={() => setMode('signup')} />;
   }
 
-  return (
-    <Landing
-      onSignupClick={() => setMode('signup')}
-      onLoginClick={() => setMode('login')}
-      onAdminClick={() => setMode('admin')}
-    />
-  );
+  return <Landing onSignupClick={() => setMode('signup')} onLoginClick={() => setMode('login')} />;
 }

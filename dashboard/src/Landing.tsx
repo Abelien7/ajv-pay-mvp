@@ -1,12 +1,36 @@
+import { useEffect, useState } from 'react';
+import { siteContentApi } from './siteContentApi';
+import type { ListItem, NewsPost } from './types';
+
+const API_DOCS_URL = 'https://ajv-pay-mvp-production.up.railway.app/docs';
+
+const METHOD_DESCRIPTIONS: Record<string, string> = {
+  'Moov Money': 'Paiement mobile via Moov Africa.',
+  'Mixx by Yas': 'Paiement mobile via Togocom.',
+};
+
 export function Landing({
   onSignupClick,
   onLoginClick,
-  onAdminClick,
 }: {
   onSignupClick: () => void;
   onLoginClick: () => void;
-  onAdminClick: () => void;
 }) {
+  const [countries, setCountries] = useState<ListItem[]>([]);
+  const [networks, setNetworks] = useState<ListItem[]>([]);
+  const [news, setNews] = useState<NewsPost[]>([]);
+
+  useEffect(() => {
+    siteContentApi.listCountries().then(setCountries);
+    siteContentApi.listNetworks().then(setNetworks);
+    siteContentApi.listNews().then(setNews);
+  }, []);
+
+  const networkNames = networks.map((n) => n.name);
+  const networksLabel =
+    networkNames.length > 0 ? networkNames.join(' et ') : 'mobile money';
+  const countriesLabel = countries.length > 0 ? countries.map((c) => c.name).join(', ') : 'Togo';
+
   return (
     <div>
       <nav className="site-nav">
@@ -19,6 +43,9 @@ export function Landing({
         <div className="nav-links">
           <a href="#comment-ca-marche">Comment ça marche</a>
           <a href="#securite">Sécurité</a>
+          <a href={API_DOCS_URL} target="_blank" rel="noreferrer">
+            Documentation API
+          </a>
           <button onClick={onLoginClick} className="btn btn-ghost">
             Se connecter
           </button>
@@ -30,7 +57,7 @@ export function Landing({
 
       <section className="hero">
         <p className="eyebrow eyebrow-on-dark">Paiement mobile money — Afrique de l'Ouest</p>
-        <h1>Encaissez Moov Money et Mixx by Yas depuis votre site, en toute confiance.</h1>
+        <h1>Encaissez {networksLabel} depuis votre site, en toute confiance.</h1>
         <p className="hero-sub">
           AJV Pay est l'intermédiaire qui connecte votre site aux paiements mobile money — vous
           intégrez une API, on s'occupe du reste : sécurité, comptabilité, notifications.
@@ -42,6 +69,25 @@ export function Landing({
           <button onClick={onLoginClick} className="btn btn-outline-light btn-lg">
             Se connecter
           </button>
+        </div>
+      </section>
+
+      <section className="proof-strip">
+        <div className="proof-item">
+          <div className="proof-value">{networks.length || 2}</div>
+          <div className="proof-label">Réseaux mobile money couverts</div>
+        </div>
+        <div className="proof-item">
+          <div className="proof-value">100%</div>
+          <div className="proof-label">Transactions tracées, jamais modifiables</div>
+        </div>
+        <div className="proof-item">
+          <div className="proof-value">0 F</div>
+          <div className="proof-label">Coût pour tester votre intégration</div>
+        </div>
+        <div className="proof-item">
+          <div className="proof-value">Mavahi</div>
+          <div className="proof-label">Premier commerce en production sur AJV Pay</div>
         </div>
       </section>
 
@@ -69,14 +115,12 @@ export function Landing({
       <section className="site-section site-section-alt">
         <h2 className="section-heading">Moyens de paiement acceptés par vos clients</h2>
         <div className="methods-grid">
-          <div className="method-card">
-            <div className="method-name">Moov Money</div>
-            <p>Paiement mobile via Moov Africa.</p>
-          </div>
-          <div className="method-card">
-            <div className="method-name">Mixx by Yas</div>
-            <p>Paiement mobile via Togocom.</p>
-          </div>
+          {networks.map((network) => (
+            <div key={network.id} className="method-card">
+              <div className="method-name">{network.name}</div>
+              <p>{METHOD_DESCRIPTIONS[network.name] ?? 'Paiement mobile money.'}</p>
+            </div>
+          ))}
           <div className="method-card">
             <div className="method-name">Vérification manuelle</div>
             <p>Le client envoie l'argent lui-même, confirmé sous supervision AJV Pay — fonctionne dès aujourd'hui, sans attendre d'intégration réseau.</p>
@@ -102,17 +146,66 @@ export function Landing({
         </div>
       </section>
 
-      <section className="client-teaser">
-        <span className="eyebrow">Bientôt</span>
-        <h2>Un espace client AJV Pay</h2>
-        <p>Portefeuille, achat de crypto, et bien d'autres services pour vos clients — une nouvelle façon de gérer leur argent, à venir.</p>
-      </section>
+      {news.length > 0 ? (
+        <section className="site-section">
+          <h2 className="section-heading">Actualités</h2>
+          <div className="steps-grid">
+            {news.map((post) => (
+              <div key={post.id} className="step-card">
+                {post.image_url && (
+                  <img
+                    src={post.image_url}
+                    alt=""
+                    style={{ width: '100%', borderRadius: 8, marginBottom: 12 }}
+                  />
+                )}
+                <h3>{post.title}</h3>
+                <p>{post.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : (
+        <section className="client-teaser">
+          <span className="eyebrow">Bientôt</span>
+          <h2>Un espace client AJV Pay</h2>
+          <p>Portefeuille, achat de crypto, et bien d'autres services pour vos clients — une nouvelle façon de gérer leur argent, à venir.</p>
+        </section>
+      )}
 
       <footer className="site-footer">
-        <span>AJV Pay — AJV Global Holdings</span>
-        <button onClick={onAdminClick} className="btn btn-ghost btn-sm">
-          Admin plateforme
-        </button>
+        <div className="footer-grid">
+          <div className="footer-col footer-brand-col">
+            <div className="nav-brand">
+              <div className="nav-brand-glyph">AP</div>
+              <span className="nav-brand-text">
+                AJV <span>Pay</span>
+              </span>
+            </div>
+            <p>Le paiement mobile money pour l'Afrique de l'Ouest, simple à intégrer.</p>
+          </div>
+          <div className="footer-col">
+            <h4>Produit</h4>
+            <a href="#comment-ca-marche">Comment ça marche</a>
+            <a href="#securite">Sécurité</a>
+            <a href={API_DOCS_URL} target="_blank" rel="noreferrer">
+              Documentation API
+            </a>
+          </div>
+          <div className="footer-col">
+            <h4>Marchands</h4>
+            <button onClick={onSignupClick} className="footer-link-btn">
+              Créer un compte
+            </button>
+            <button onClick={onLoginClick} className="footer-link-btn">
+              Se connecter
+            </button>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <span>© 2026 AJV Global Holdings</span>
+          <span>{countriesLabel}</span>
+        </div>
       </footer>
     </div>
   );
