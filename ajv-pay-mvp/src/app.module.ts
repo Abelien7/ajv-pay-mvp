@@ -6,6 +6,8 @@ import { DatabaseModule } from './database/database.module';
 import { MerchantsModule } from './merchants/merchants.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AuditModule } from './audit/audit.module';
+import { OutboxModule } from './outbox/outbox.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 import { HealthController } from './health.controller';
 
 /**
@@ -16,6 +18,12 @@ import { HealthController } from './health.controller';
  * même dépôt. L'API déclenche déjà une livraison immédiate best-effort
  * juste après une transition de paiement (voir PaymentOrchestrator), le
  * Worker n'étant qu'un filet de sécurité en continu.
+ *
+ * OutboxModule/WebhooksModule sont déjà utilisés à l'intérieur
+ * d'OrchestratorModule (via PaymentsModule) mais pas ré-exportés par lui —
+ * importés ici séparément pour que HealthController (voir /health) puisse
+ * lire la taille des files d'attente. Nest réutilise la même instance
+ * singleton de chaque service, importer un module deux fois ne duplique rien.
  */
 @Module({
   imports: [
@@ -25,6 +33,8 @@ import { HealthController } from './health.controller';
     AuditModule,
     MerchantsModule,
     PaymentsModule,
+    OutboxModule,
+    WebhooksModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

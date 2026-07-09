@@ -108,4 +108,15 @@ export class OutboxService {
       [eventId],
     );
   }
+
+  /** Utilisé par /health : taille de la file non traitée et âge du plus vieux événement en attente. */
+  async getBacklogStats(): Promise<{ unprocessedCount: number; oldestUnprocessedAt: Date | null }> {
+    const { rows } = await this.db.query<{ count: string; oldest: Date | null }>(
+      `SELECT COUNT(*) AS count, MIN(created_at) AS oldest FROM outbox_events WHERE processed = FALSE`,
+    );
+    return {
+      unprocessedCount: Number(rows[0]?.count ?? 0),
+      oldestUnprocessedAt: rows[0]?.oldest ?? null,
+    };
+  }
 }

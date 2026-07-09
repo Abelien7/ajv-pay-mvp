@@ -86,6 +86,17 @@ export class WebhooksService {
    * "no silent failure allowed" : un webhook qui épuise ses tentatives
    * reste visible en `status = 'failed'`, jamais supprimé silencieusement.
    */
+  /** Utilisé par /health : nombre de livraisons encore en attente et âge de la plus ancienne. */
+  async getPendingBacklogStats(): Promise<{ pendingCount: number; oldestPendingAt: Date | null }> {
+    const { rows } = await this.db.query<{ count: string; oldest: Date | null }>(
+      `SELECT COUNT(*) AS count, MIN(created_at) AS oldest FROM webhook_attempts WHERE status = 'pending'`,
+    );
+    return {
+      pendingCount: Number(rows[0]?.count ?? 0),
+      oldestPendingAt: rows[0]?.oldest ?? null,
+    };
+  }
+
   async processDue(): Promise<void> {
     const { rows } = await this.db.query<WebhookAttemptRow>(
       `SELECT * FROM webhook_attempts

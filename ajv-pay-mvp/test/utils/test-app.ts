@@ -33,7 +33,8 @@ export async function resetDatabase(app: INestApplication): Promise<void> {
   await db.query(`
     TRUNCATE TABLE
       webhook_attempts, outbox_events, manual_payment_proofs, ledger_entries,
-      payment_events, payments, idempotency_keys, audit_logs, merchants
+      payment_events, payments, idempotency_keys, audit_logs, merchants,
+      worker_heartbeats
     CASCADE
   `);
 }

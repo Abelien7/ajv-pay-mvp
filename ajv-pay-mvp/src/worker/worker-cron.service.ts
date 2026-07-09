@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { DatabaseService } from '../database/database.service';
 import { OutboxProcessorService } from '../outbox/outbox-processor.service';
 import { WebhooksService } from '../webhooks/webhooks.service';
 
@@ -16,17 +17,35 @@ export class WorkerCronService {
   private readonly logger = new Logger(WorkerCronService.name);
 
   constructor(
+    private readonly db: DatabaseService,
     private readonly outboxProcessor: OutboxProcessorService,
     private readonly webhooks: WebhooksService,
   ) {}
 
   @Cron(CronExpression.EVERY_10_SECONDS)
   async tick(): Promise<void> {
+    // Écrit AVANT le traitement, pas après : le battement de cœur doit
+    // prouver que la boucle Worker tourne toujours, même si processOutbox/
+    // processDue échouent eux-mêmes — /health (process API séparé) n'a
+    // aucun autre moyen de savoir si ce process est encore vivant.
+    await this.recordHeartbeat();
+
     try {
       await this.outboxProcessor.processOutbox();
       await this.webhooks.processDue();
     } catch (err: any) {
       this.logger.error(`Erreur pendant le tick worker: ${err.message}`);
+    }
+  }
+
+  private async recordHeartbeat(): Promise<void> {
+    try {
+      await this.db.query(
+        `INSERT INTO worker_heartbeats (id, last_tick_at) VALUES ('worker', NOW())
+         ON CONFLICT (id) DO UPDATE SET last_tick_at = NOW()`,
+      );
+    } catch (err: any) {
+      this.logger.error(`Échec écriture du battement de cœur: ${err.message}`);
     }
   }
 }
