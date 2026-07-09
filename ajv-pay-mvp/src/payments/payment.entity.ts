@@ -1,3 +1,5 @@
+import { PaymentMode } from '../merchants/merchant.entity';
+
 export type PaymentStatus =
   | 'pending'
   | 'processing'
@@ -12,6 +14,8 @@ export interface Payment {
   amount: number;
   currency: string;
   method: 'moov' | 'mixx' | 'manual';
+  /** 'test' => jamais de ledger, résolution instantanée (voir TestModeAdapter). */
+  mode: PaymentMode;
   phone_number: string | null;
   status: PaymentStatus;
   provider_reference: string | null;

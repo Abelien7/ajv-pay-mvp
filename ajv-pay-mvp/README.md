@@ -71,6 +71,28 @@ Deux modèles d'authentification distincts, jamais mélangés :
 - `X-Signature: <hmac_sha256(hmac_secret, JSON.stringify(body))>` (obligatoire dès qu'il y a un corps de requête)
 - `Idempotency-Key: <clé unique côté marchand>` (obligatoire pour `POST /payments`)
 
+## Mode test / sandbox
+
+Chaque marchand reçoit DEUX paires de clés à l'inscription (`POST /merchants/register`
+ou `scripts/create-merchant.js`) — même principe que Stripe :
+
+| | Préfixe clé API | Effet |
+|---|---|---|
+| **live** | `ajvpay_live_...` | Paiement réel, écrit dans le ledger, passe par les vrais providers (moov/mixx) ou la revue admin (manual). |
+| **test** | `ajvpay_test_...` | Paiement simulé (`TestModeAdapter`), résolu **instantanément**, **jamais** d'écriture ledger, **jamais** visible dans la file d'admin. |
+
+Le mode est déterminé automatiquement par la clé API utilisée — jamais un champ que le marchand choisit dans le corps de la requête.
+
+**Convention de test** (comme les cartes de test Stripe) : en mode test, un
+paiement réussit toujours, **sauf** si `phoneNumber` se termine par `9999`,
+auquel cas il échoue instantanément — utile pour tester la gestion d'échec
+côté marchand.
+
+Le webhook de notification part normalement en mode test (c'est ce qui
+permet de tester une intégration de bout en bout) ; seule la comptabilité
+(ledger) est ignorée. Une `Idempotency-Key` peut être réutilisée en live et
+en test sans conflit — ce sont deux univers de données séparés.
+
 **Admin plateforme** (routes `/admin/manual-payments/*`) :
 - `Authorization: Bearer <ADMIN_API_KEY>` — une seule clé partagée, pas de
   signature. Un seul admin humain pour l'instant, voit et décide pour tous

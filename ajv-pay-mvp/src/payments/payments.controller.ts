@@ -11,6 +11,8 @@ import {
 } from '@nestjs/common';
 import { ApiKeyGuard } from '../common/auth/api-key.guard';
 import { CurrentMerchant } from '../common/auth/current-merchant.decorator';
+import { CurrentPaymentMode } from '../common/auth/current-payment-mode.decorator';
+import { PaymentMode } from '../merchants/merchant.entity';
 import { PaymentsService } from './payments.service';
 import { PaymentOrchestrator } from '../orchestrator/payment-orchestrator.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -46,10 +48,11 @@ export class PaymentsController {
   @Post()
   async create(
     @CurrentMerchant() merchant: Merchant,
+    @CurrentPaymentMode() mode: PaymentMode,
     @Body() dto: CreatePaymentDto,
     @Headers('idempotency-key') idempotencyKey: string,
   ) {
-    const payment = await this.orchestrator.createPayment(dto, merchant, idempotencyKey);
+    const payment = await this.orchestrator.createPayment(dto, merchant, mode, idempotencyKey);
     return this.toResponse(payment);
   }
 
@@ -112,6 +115,7 @@ export class PaymentsController {
       amount: payment.amount,
       currency: payment.currency,
       method: payment.method,
+      mode: payment.mode,
       status: payment.status,
       provider_reference: payment.provider_reference,
       redirect_url: payment.redirect_url,

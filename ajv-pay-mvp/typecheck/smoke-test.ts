@@ -142,7 +142,7 @@ async function main() {
           return { rows: [] }; // INSERT ... ON CONFLICT DO NOTHING
         },
       };
-      const result = await idempotency.checkAndReserve(fakeClient, 'm1', 'key-1', { amount: 5000 });
+      const result = await idempotency.checkAndReserve(fakeClient, 'm1', 'live', 'key-1', { amount: 5000 });
       check('Première utilisation d’une clé → isReplay = false', result.isReplay === false);
     }
 
@@ -158,7 +158,7 @@ async function main() {
           return { rows: [] };
         },
       };
-      const result = await idempotency.checkAndReserve(fakeClient, 'm1', 'key-2', payload);
+      const result = await idempotency.checkAndReserve(fakeClient, 'm1', 'live', 'key-2', payload);
       check('Même payload + même clé → isReplay = true', result.isReplay === true);
       check('La réponse existante est bien renvoyée', result.existingResponse?.id === 'p-existing');
     }
@@ -173,7 +173,7 @@ async function main() {
           return { rows: [] };
         },
       };
-      await idempotency.checkAndReserve(fakeClient, 'm1', 'key-3', { amount: 9999 });
+      await idempotency.checkAndReserve(fakeClient, 'm1', 'live', 'key-3', { amount: 9999 });
     });
   }
 

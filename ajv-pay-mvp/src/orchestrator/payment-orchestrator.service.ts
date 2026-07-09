@@ -9,6 +9,7 @@ import { OutboxProcessorService } from '../outbox/outbox-processor.service';
 import { WebhooksService } from '../webhooks/webhooks.service';
 import { CreatePaymentDto } from '../payments/dto/create-payment.dto';
 import { Payment, PaymentStatus } from '../payments/payment.entity';
+import { PaymentMode } from '../merchants/merchant.entity';
 
 /**
  * PaymentOrchestrator — RÈGLE ARCHITECTURALE FONDAMENTALE :
@@ -67,8 +68,13 @@ export class PaymentOrchestrator {
    *   4. connector.initiate  (ConnectorService — hors transaction)
    *   5. commitFinalState    (transaction UNIQUE : statut + ledger + outbox)
    */
-  async createPayment(dto: CreatePaymentDto, merchant: { id: string }, idempotencyKey: string): Promise<Payment> {
-    const payment = await this.payments.create(dto, merchant, idempotencyKey);
+  async createPayment(
+    dto: CreatePaymentDto,
+    merchant: { id: string },
+    mode: PaymentMode,
+    idempotencyKey: string,
+  ): Promise<Payment> {
+    const payment = await this.payments.create(dto, merchant, mode, idempotencyKey);
 
     if (['succeeded', 'failed', 'expired', 'refunded'].includes(payment.status)) {
       return payment; // replay idempotent d'un paiement déjà finalisé
@@ -229,26 +235,34 @@ export class PaymentOrchestrator {
         return updated;
       }
 
-      if (status === 'succeeded') {
-        const providerAccount = providerLedgerAccount(updated.method);
-        await this.ledger.writeEntries(client, {
-          paymentId: updated.id,
-          merchantId: updated.merchant_id,
-          currency: updated.currency,
-          reference: `payment:${updated.id}`,
-          lines: this.ledger.buildSuccessEntries(updated.amount, providerAccount),
-        });
-      }
+      // Un paiement "test" (voir migrations/009_sandbox_mode.sql) n'a aucune
+      // réalité financière : il ne doit JAMAIS écrire dans le ledger, sous
+      // peine de fausser le solde réel du marchand avec de l'argent qui
+      // n'existe pas. Statut + outbox/webhook restent traités normalement —
+      // c'est justement ce qui permet à un marchand de tester son
+      // intégration de bout en bout.
+      if (updated.mode === 'live') {
+        if (status === 'succeeded') {
+          const providerAccount = providerLedgerAccount(updated.method);
+          await this.ledger.writeEntries(client, {
+            paymentId: updated.id,
+            merchantId: updated.merchant_id,
+            currency: updated.currency,
+            reference: `payment:${updated.id}`,
+            lines: this.ledger.buildSuccessEntries(updated.amount, providerAccount),
+          });
+        }
 
-      if (status === 'refunded') {
-        const providerAccount = providerLedgerAccount(updated.method);
-        await this.ledger.writeEntries(client, {
-          paymentId: updated.id,
-          merchantId: updated.merchant_id,
-          currency: updated.currency,
-          reference: `refund:${updated.id}`,
-          lines: this.ledger.buildRefundEntries(updated.amount, providerAccount),
-        });
+        if (status === 'refunded') {
+          const providerAccount = providerLedgerAccount(updated.method);
+          await this.ledger.writeEntries(client, {
+            paymentId: updated.id,
+            merchantId: updated.merchant_id,
+            currency: updated.currency,
+            reference: `refund:${updated.id}`,
+            lines: this.ledger.buildRefundEntries(updated.amount, providerAccount),
+          });
+        }
       }
 
       if (['succeeded', 'failed', 'expired', 'refunded'].includes(status)) {

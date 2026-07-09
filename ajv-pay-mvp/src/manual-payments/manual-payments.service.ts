@@ -103,7 +103,14 @@ export class ManualPaymentsService {
     );
   }
 
-  /** Paiements 'manual' en attente de revue, avec toutes les preuves soumises (la plus récente en premier). */
+  /**
+   * Paiements 'manual' en attente de revue, avec toutes les preuves
+   * soumises (la plus récente en premier). `mode = 'live'` uniquement : un
+   * paiement test (voir migrations/009_sandbox_mode.sql) est résolu
+   * instantanément par TestModeAdapter et n'atteint jamais ce statut — le
+   * filtre reste explicite ici en garde-fou, pour que cette file continue
+   * de ne montrer QUE du vrai argent même si ce comportement changeait un jour.
+   */
   async listPending(): Promise<PendingManualPayment[]> {
     const { rows } = await this.db.query<PendingManualPayment>(
       `SELECT p.*, m.name AS merchant_name,
@@ -114,7 +121,7 @@ export class ManualPaymentsService {
               ) AS proofs
        FROM payments p
        JOIN merchants m ON m.id = p.merchant_id
-       WHERE p.method = 'manual' AND p.status = 'processing'
+       WHERE p.method = 'manual' AND p.status = 'processing' AND p.mode = 'live'
        ORDER BY p.created_at ASC`,
     );
     return rows;

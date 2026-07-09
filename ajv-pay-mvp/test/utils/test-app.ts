@@ -9,6 +9,8 @@ export interface TestMerchant {
   id: string;
   apiKey: string;
   hmacSecret: string;
+  testApiKey: string;
+  testHmacSecret: string;
 }
 
 /**
@@ -39,22 +41,24 @@ export async function resetDatabase(app: INestApplication): Promise<void> {
   `);
 }
 
-/** Réplique la logique de scripts/create-merchant.js, mais en process pour les tests. */
+/** Réplique la logique de scripts/create-merchant.js (2 paires de clés), mais en process pour les tests. */
 export async function createTestMerchant(
   app: INestApplication,
   name = 'Test Merchant',
 ): Promise<TestMerchant> {
   const db = app.get(DatabaseService);
-  const apiKey = `ajvpay_test_${randomBytes(16).toString('hex')}`;
+  const apiKey = `ajvpay_live_test_${randomBytes(16).toString('hex')}`;
   const hmacSecret = randomBytes(32).toString('hex');
+  const testApiKey = `ajvpay_test_test_${randomBytes(16).toString('hex')}`;
+  const testHmacSecret = randomBytes(32).toString('hex');
 
   const { rows } = await db.query<{ id: string }>(
-    `INSERT INTO merchants (name, email, api_key_hash, hmac_secret)
-     VALUES ($1, $2, $3, $4) RETURNING id`,
-    [name, null, hashApiKey(apiKey), hmacSecret],
+    `INSERT INTO merchants (name, email, api_key_hash, hmac_secret, test_api_key_hash, test_hmac_secret)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+    [name, null, hashApiKey(apiKey), hmacSecret, hashApiKey(testApiKey), testHmacSecret],
   );
 
-  return { id: rows[0].id, apiKey, hmacSecret };
+  return { id: rows[0].id, apiKey, hmacSecret, testApiKey, testHmacSecret };
 }
 
 /**
@@ -81,4 +85,20 @@ export function signedHeaders(
 /** En-tête d'authentification pour une simple lecture GET (signature optionnelle, voir ApiKeyGuard). */
 export function authHeader(merchant: TestMerchant): Record<string, string> {
   return { Authorization: `Bearer ${merchant.apiKey}` };
+}
+
+/** Équivalent de signedHeaders() mais avec la paire de clés "test" du marchand (voir migrations/009_sandbox_mode.sql). */
+export function signedTestModeHeaders(
+  merchant: TestMerchant,
+  body: unknown,
+  idempotencyKey?: string,
+): Record<string, string> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${merchant.testApiKey}`,
+    'X-Signature': computeHmacSignature(merchant.testHmacSecret, JSON.stringify(body ?? {})),
+  };
+  if (idempotencyKey) {
+    headers['Idempotency-Key'] = idempotencyKey;
+  }
+  return headers;
 }

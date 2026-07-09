@@ -15,24 +15,30 @@ export class MerchantsController {
   ) {}
 
   /**
-   * Inscription publique — aucune authentification requise.
-   * Retourne la clé API et le secret HMAC EN CLAIR une seule fois.
-   * Le marchand doit les conserver immédiatement : ils ne sont plus
-   * récupérables après cette réponse (seul le hash est stocké en base).
+   * Inscription publique — aucune authentification requise. Retourne LES
+   * DEUX paires de clés (live + test, voir migrations/009_sandbox_mode.sql)
+   * EN CLAIR une seule fois. Le marchand doit les conserver immédiatement :
+   * elles ne sont plus récupérables après cette réponse (seuls les hashs
+   * sont stockés en base). Recommandation : intégrer et tester d'abord avec
+   * la paire "test" (aucun impact financier, résolution instantanée), ne
+   * passer en "live" qu'une fois l'intégration validée.
    */
   @Post('register')
   @HttpCode(201)
   async register(@Body() dto: RegisterMerchantDto) {
-    const { merchant, apiKey, hmacSecret } = await this.merchants.register(dto);
+    const { merchant, live, test } = await this.merchants.register(dto);
     return {
       id: merchant.id,
       name: merchant.name,
       email: merchant.email,
-      api_key: apiKey,
-      hmac_secret: hmacSecret,
+      live_api_key: live.apiKey,
+      live_hmac_secret: live.hmacSecret,
+      test_api_key: test.apiKey,
+      test_hmac_secret: test.hmacSecret,
       is_active: merchant.is_active,
       created_at: merchant.created_at,
-      _notice: 'Conservez api_key et hmac_secret maintenant — ils ne seront plus affichés.',
+      _notice:
+        'Conservez ces 4 valeurs maintenant — elles ne seront plus affichées. Commencez par intégrer avec la paire "test", aucun impact financier.',
     };
   }
 

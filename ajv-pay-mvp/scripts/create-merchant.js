@@ -19,24 +19,38 @@ async function main() {
     process.exit(1);
   }
 
-  const apiKey = `ajv_live_${crypto.randomBytes(24).toString('hex')}`;
-  const hmacSecret = crypto.randomBytes(32).toString('hex');
-  const apiKeyHash = hashApiKey(apiKey);
+  // Deux paires de clés d'un coup, comme POST /merchants/register (voir
+  // migrations/009_sandbox_mode.sql) — la paire "test" ne touche jamais le
+  // ledger, résolution instantanée via TestModeAdapter.
+  const liveApiKey = `ajvpay_live_${crypto.randomBytes(24).toString('hex')}`;
+  const liveHmacSecret = crypto.randomBytes(32).toString('hex');
+  const testApiKey = `ajvpay_test_${crypto.randomBytes(24).toString('hex')}`;
+  const testHmacSecret = crypto.randomBytes(32).toString('hex');
 
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const { rows } = await pool.query(
-    `INSERT INTO merchants (name, email, api_key_hash, hmac_secret, webhook_url)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO merchants (name, email, api_key_hash, hmac_secret, test_api_key_hash, test_hmac_secret, webhook_url)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING id`,
-    [name, email ?? null, apiKeyHash, hmacSecret, webhookUrl ?? null],
+    [
+      name,
+      email ?? null,
+      hashApiKey(liveApiKey),
+      liveHmacSecret,
+      hashApiKey(testApiKey),
+      testHmacSecret,
+      webhookUrl ?? null,
+    ],
   );
   await pool.end();
 
   console.log('Marchand créé avec succès.');
   console.log('-----------------------------------------');
-  console.log(`merchant_id : ${rows[0].id}`);
-  console.log(`API Key     : ${apiKey}   (à conserver, non récupérable ensuite)`);
-  console.log(`HMAC Secret : ${hmacSecret}   (à conserver, non récupérable ensuite)`);
+  console.log(`merchant_id      : ${rows[0].id}`);
+  console.log(`Live API Key     : ${liveApiKey}   (à conserver, non récupérable ensuite)`);
+  console.log(`Live HMAC Secret : ${liveHmacSecret}   (à conserver, non récupérable ensuite)`);
+  console.log(`Test API Key     : ${testApiKey}   (à conserver, non récupérable ensuite)`);
+  console.log(`Test HMAC Secret : ${testHmacSecret}   (à conserver, non récupérable ensuite)`);
   console.log('-----------------------------------------');
 }
 

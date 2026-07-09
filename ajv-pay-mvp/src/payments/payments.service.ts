@@ -5,6 +5,7 @@ import { IdempotencyService } from '../common/idempotency/idempotency.service';
 import { PaymentEventsService } from '../events/payment-events.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { Payment, PaymentStatus } from './payment.entity';
+import { PaymentMode } from '../merchants/merchant.entity';
 
 export interface ProviderResult {
   status: 'processing' | 'succeeded' | 'failed';
@@ -45,22 +46,27 @@ export class PaymentsService {
    * pas de ledger/outbox concerné à ce stade (un paiement `pending` n'a
    * encore aucune réalité financière).
    */
-  async create(dto: CreatePaymentDto, merchant: { id: string }, idempotencyKey: string): Promise<Payment> {
+  async create(
+    dto: CreatePaymentDto,
+    merchant: { id: string },
+    mode: PaymentMode,
+    idempotencyKey: string,
+  ): Promise<Payment> {
     if (!idempotencyKey) {
       throw new Error('Idempotency-Key est obligatoire pour créer un paiement.');
     }
     const merchantId = merchant.id;
 
     const { payment, isReplay } = await this.db.withTransaction(async (client) => {
-      const check = await this.idempotency.checkAndReserve(client, merchantId, idempotencyKey, dto);
+      const check = await this.idempotency.checkAndReserve(client, merchantId, mode, idempotencyKey, dto);
 
       if (check.isReplay && check.existingResponse) {
         return { payment: check.existingResponse as Payment, isReplay: true };
       }
 
       const existingPayment = await client.query<Payment>(
-        `SELECT * FROM payments WHERE merchant_id = $1 AND idempotency_key = $2`,
-        [merchantId, idempotencyKey],
+        `SELECT * FROM payments WHERE merchant_id = $1 AND mode = $2 AND idempotency_key = $3`,
+        [merchantId, mode, idempotencyKey],
       );
       if (existingPayment.rows.length > 0) {
         return { payment: existingPayment.rows[0], isReplay: true };
@@ -68,14 +74,15 @@ export class PaymentsService {
 
       const inserted = await client.query<Payment>(
         `INSERT INTO payments
-           (merchant_id, amount, currency, method, phone_number, idempotency_key, metadata, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+           (merchant_id, amount, currency, method, mode, phone_number, idempotency_key, metadata, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
          RETURNING *`,
         [
           merchantId,
           dto.amount,
           dto.currency ?? 'XOF',
           dto.method,
+          mode,
           dto.phoneNumber,
           idempotencyKey,
           dto.metadata ? JSON.stringify(dto.metadata) : null,
@@ -84,7 +91,7 @@ export class PaymentsService {
       const created = inserted.rows[0];
 
       await this.events.record(client, created.id, 'created', { amount: created.amount });
-      await this.idempotency.storeResponse(client, merchantId, idempotencyKey, created);
+      await this.idempotency.storeResponse(client, merchantId, mode, idempotencyKey, created);
 
       return { payment: created, isReplay: false };
     });

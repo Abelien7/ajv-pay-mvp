@@ -25,7 +25,7 @@ export class ApiKeyGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const req = context.switchToHttp().getRequest<Request & { merchant?: any }>();
+    const req = context.switchToHttp().getRequest<Request & { merchant?: any; paymentMode?: 'live' | 'test' }>();
     const ip = req.ip;
 
     const authHeader = this.singleHeader(req.headers['authorization']);
@@ -41,8 +41,8 @@ export class ApiKeyGuard implements CanActivate {
     }
     const apiKey = authHeader.slice('Bearer '.length).trim();
 
-    const merchant = await this.merchants.findByApiKey(apiKey);
-    if (!merchant) {
+    const match = await this.merchants.findByApiKey(apiKey);
+    if (!match) {
       await this.audit.record({
         actorType: 'merchant',
         action: 'auth.failed',
@@ -52,15 +52,16 @@ export class ApiKeyGuard implements CanActivate {
       });
       throw new UnauthorizedException('Clé API invalide');
     }
+    const { merchant, mode } = match;
+    // Chaque mode a son propre secret HMAC — jamais celui de l'autre,
+    // même s'ils appartiennent au même marchand (voir migrations/009_sandbox_mode.sql).
+    const hmacSecret = mode === 'test' ? merchant.test_hmac_secret! : merchant.hmac_secret;
 
     const signature = this.singleHeader(req.headers['x-signature']);
     if (signature) {
       // La signature est optionnelle pour GET (lecture simple), mais
       // obligatoire dès qu'un body est envoyé (POST/PUT) — voir contrôle ci-dessous.
-      const expected = computeHmacSignature(
-        merchant.hmac_secret,
-        JSON.stringify(req.body ?? {}),
-      );
+      const expected = computeHmacSignature(hmacSecret, JSON.stringify(req.body ?? {}));
       if (!safeCompare(signature, expected)) {
         await this.audit.record({
           actorType: 'merchant',
@@ -77,6 +78,7 @@ export class ApiKeyGuard implements CanActivate {
     }
 
     req.merchant = merchant;
+    req.paymentMode = mode;
     return true;
   }
 

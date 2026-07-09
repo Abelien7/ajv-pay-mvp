@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { MoovAdapter } from './adapters/moov.adapter';
 import { MixxAdapter } from './adapters/mixx.adapter';
 import { ManualAdapter } from './adapters/manual.adapter';
+import { TestModeAdapter } from './adapters/test-mode.adapter';
 import { PAYMENT_ADAPTER_REGISTRY } from './connector.token';
 import { PaymentProviderAdapter, ProviderName } from './connector.interface';
 import { ConnectorService } from './connector.service';
@@ -29,6 +30,7 @@ import { ConnectorService } from './connector.service';
     MoovAdapter,
     MixxAdapter,
     ManualAdapter,
+    TestModeAdapter,
     ConnectorService,
     {
       provide: PAYMENT_ADAPTER_REGISTRY,

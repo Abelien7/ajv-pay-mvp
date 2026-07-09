@@ -2,6 +2,7 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../../database/database.service';
+import { PaymentMode } from '../../merchants/merchant.entity';
 
 export interface IdempotencyCheckResult {
   /** true si une réponse existante doit être renvoyée telle quelle */
@@ -32,9 +33,17 @@ export class IdempotencyService {
    * À appeler en tout début de traitement, AVANT toute écriture métier,
    * et dans la même transaction que la création du paiement (cf. PaymentsService).
    */
+  /**
+   * `mode` (live|test, résolu par ApiKeyGuard selon la clé utilisée) fait
+   * partie de la clé d'unicité (voir migrations/009_sandbox_mode.sql) : un
+   * marchand peut réutiliser la même Idempotency-Key en test et en live
+   * sans conflit — ce sont deux univers de données séparés, comme chez
+   * Stripe.
+   */
   async checkAndReserve(
     client: PoolClient,
     merchantId: string,
+    mode: PaymentMode,
     idemKey: string,
     requestPayload: unknown,
   ): Promise<IdempotencyCheckResult> {
@@ -42,9 +51,9 @@ export class IdempotencyService {
 
     const { rows } = await client.query(
       `SELECT request_hash, response FROM idempotency_keys
-       WHERE merchant_id = $1 AND idem_key = $2
+       WHERE merchant_id = $1 AND mode = $2 AND idem_key = $3
        FOR UPDATE`,
-      [merchantId, idemKey],
+      [merchantId, mode, idemKey],
     );
 
     if (rows.length > 0) {
@@ -61,12 +70,12 @@ export class IdempotencyService {
     // process crashe entre la réservation et l'écriture de la réponse, la
     // clé existe mais sans réponse — le code appelant doit gérer ce cas en
     // continuant le traitement (idempotent par construction du paiement lui-même
-    // via la contrainte UNIQUE(merchant_id, idempotency_key) sur `payments`).
+    // via la contrainte UNIQUE(merchant_id, mode, idempotency_key) sur `payments`).
     await client.query(
-      `INSERT INTO idempotency_keys (merchant_id, idem_key, request_hash)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (merchant_id, idem_key) DO NOTHING`,
-      [merchantId, idemKey, requestHash],
+      `INSERT INTO idempotency_keys (merchant_id, mode, idem_key, request_hash)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (merchant_id, mode, idem_key) DO NOTHING`,
+      [merchantId, mode, idemKey, requestHash],
     );
 
     return { isReplay: false, existingResponse: null };
@@ -76,13 +85,14 @@ export class IdempotencyService {
   async storeResponse(
     client: PoolClient,
     merchantId: string,
+    mode: PaymentMode,
     idemKey: string,
     response: unknown,
   ): Promise<void> {
     await client.query(
-      `UPDATE idempotency_keys SET response = $3
-       WHERE merchant_id = $1 AND idem_key = $2`,
-      [merchantId, idemKey, JSON.stringify(response)],
+      `UPDATE idempotency_keys SET response = $4
+       WHERE merchant_id = $1 AND mode = $2 AND idem_key = $3`,
+      [merchantId, mode, idemKey, JSON.stringify(response)],
     );
   }
 }
