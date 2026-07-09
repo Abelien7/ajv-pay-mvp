@@ -1,6 +1,8 @@
 node_modules/
 dist/
+coverage/
 .env
+.env.test
 *.log
 
 # Supabase CLI local link metadata

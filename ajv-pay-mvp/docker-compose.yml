@@ -1,0 +1,25 @@
+# Base Postgres dédiée aux tests d'intégration/e2e (npm run test:e2e).
+#
+# Port 5433 et base ajvpay_test volontairement distincts du 5432/ajvpay de
+# .env.example (dev) : les tests font des TRUNCATE entre chaque suite, donc
+# ne doivent jamais pouvoir toucher une base de dev ou de prod par erreur
+# de configuration.
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ajvpay
+      POSTGRES_PASSWORD: ajvpay
+      POSTGRES_DB: ajvpay_test
+    ports:
+      - '5433:5432'
+    volumes:
+      - ajvpay_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ajvpay -d ajvpay_test']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  ajvpay_test_data:
