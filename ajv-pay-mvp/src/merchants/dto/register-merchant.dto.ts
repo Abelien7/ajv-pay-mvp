@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, IsUrl, MaxLength, MinLength } from 'class-validator';
 
 export class RegisterMerchantDto {
   @IsString()
@@ -6,9 +6,14 @@ export class RegisterMerchantDto {
   @MaxLength(200)
   name!: string;
 
-  @IsOptional()
+  /** Obligatoire : sert aussi d'identifiant de connexion au dashboard (voir merchant_users). */
   @IsEmail({}, { message: 'email doit être une adresse e-mail valide.' })
-  email?: string;
+  email!: string;
+
+  /** Mot de passe du compte de connexion dashboard créé avec le marchand — jamais confondu avec hmac_secret (clé d'intégration). */
+  @IsString()
+  @MinLength(8, { message: 'password doit contenir au moins 8 caractères.' })
+  password!: string;
 
   @IsOptional()
   @IsUrl({ require_tld: false }, { message: 'webhookUrl doit être une URL valide.' })

@@ -29,12 +29,6 @@ export interface MerchantMeResponse {
   is_active: boolean;
 }
 
-export interface Credentials {
-  apiBaseUrl: string;
-  apiKey: string;
-  hmacSecret: string;
-}
-
 export interface AdminCredentials {
   apiBaseUrl: string;
   adminKey: string;

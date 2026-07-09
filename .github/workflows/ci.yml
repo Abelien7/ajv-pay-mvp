@@ -54,6 +54,7 @@ jobs:
       MANUAL_PAYMENT_NUMBER_MIXX: '90000001'
       ADMIN_API_KEY: ci-admin-key
       WEBHOOK_MAX_ATTEMPTS: '5'
+      LOGIN_THROTTLE_LIMIT: '1000'
 
     steps:
       - uses: actions/checkout@v4

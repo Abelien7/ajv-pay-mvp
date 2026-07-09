@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/dashboard.tsx","./src/loginform.tsx","./src/api.ts","./src/main.tsx","./src/types.ts","./src/usecredentials.ts","./src/vite-env.d.ts"],"version":"5.9.3"}
+{"root":["./src/admindashboard.tsx","./src/adminloginform.tsx","./src/app.tsx","./src/dashboard.tsx","./src/loginform.tsx","./src/adminapi.ts","./src/dashboardapi.ts","./src/main.tsx","./src/types.ts","./src/useadmincredentials.ts","./src/usesession.ts","./src/vite-env.d.ts"],"version":"5.9.3"}

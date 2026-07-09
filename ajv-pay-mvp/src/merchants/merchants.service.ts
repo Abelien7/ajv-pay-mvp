@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto';
 import { DatabaseService } from '../database/database.service';
 import { Merchant, PaymentMode } from './merchant.entity';
 import { hashApiKey } from '../common/auth/hmac.util';
+import { hashPassword } from '../common/auth/password.util';
 import { RegisterMerchantDto } from './dto/register-merchant.dto';
 
 export interface MerchantMatch {
@@ -51,8 +52,17 @@ export class MerchantsService {
    * Crée un nouveau compte marchand avec SES DEUX paires de clés d'un coup
    * (comme l'onboarding Stripe) : une "live" (paiements réels, ledger) et
    * une "test" (paiements simulés, jamais de ledger — voir
-   * TestModeAdapter). Les 4 secrets en clair ne sont retournés qu'UNE
-   * SEULE FOIS — seuls leurs hashs sont conservés en base.
+   * TestModeAdapter) — PLUS son compte de connexion dashboard
+   * (merchant_users, voir migrations/010_merchant_dashboard_auth.sql).
+   * Les deux écritures (merchant + merchant_user) sont dans UNE SEULE
+   * transaction : un compte marchand sans aucun moyen de se connecter au
+   * dashboard serait un état incohérent, jamais acceptable même en cas
+   * d'échec partiel (règle déjà appliquée partout ailleurs dans ce
+   * projet — voir DatabaseService.withTransaction).
+   *
+   * Les secrets en clair (clés live/test + mot de passe fourni par le
+   * marchand lui-même) ne sont retournés/utilisés qu'UNE SEULE FOIS ici —
+   * seuls leurs hashs sont conservés en base.
    */
   async register(
     dto: RegisterMerchantDto,
@@ -65,24 +75,36 @@ export class MerchantsService {
     const liveHmacSecret = randomBytes(32).toString('hex');
     const testApiKey = `ajvpay_test_${randomBytes(24).toString('hex')}`;
     const testHmacSecret = randomBytes(32).toString('hex');
+    const passwordHash = await hashPassword(dto.password);
 
     try {
-      const { rows } = await this.db.query<Merchant>(
-        `INSERT INTO merchants (name, email, api_key_hash, hmac_secret, test_api_key_hash, test_hmac_secret, webhook_url)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING *`,
-        [
-          dto.name,
-          dto.email ?? null,
-          hashApiKey(liveApiKey),
-          liveHmacSecret,
-          hashApiKey(testApiKey),
-          testHmacSecret,
-          dto.webhookUrl ?? null,
-        ],
-      );
+      const merchant = await this.db.withTransaction(async (client) => {
+        const { rows } = await client.query<Merchant>(
+          `INSERT INTO merchants (name, email, api_key_hash, hmac_secret, test_api_key_hash, test_hmac_secret, webhook_url)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING *`,
+          [
+            dto.name,
+            dto.email,
+            hashApiKey(liveApiKey),
+            liveHmacSecret,
+            hashApiKey(testApiKey),
+            testHmacSecret,
+            dto.webhookUrl ?? null,
+          ],
+        );
+        const created = rows[0];
+
+        await client.query(
+          `INSERT INTO merchant_users (merchant_id, email, password_hash) VALUES ($1, $2, $3)`,
+          [created.id, dto.email, passwordHash],
+        );
+
+        return created;
+      });
+
       return {
-        merchant: rows[0],
+        merchant,
         live: { apiKey: liveApiKey, hmacSecret: liveHmacSecret },
         test: { apiKey: testApiKey, hmacSecret: testHmacSecret },
       };

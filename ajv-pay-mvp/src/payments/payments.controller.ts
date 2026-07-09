@@ -19,6 +19,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { Merchant } from '../merchants/merchant.entity';
 import { ManualPaymentsService } from '../manual-payments/manual-payments.service';
 import { SubmitProofDto } from '../manual-payments/dto/submit-proof.dto';
+import { toPaymentResponse } from './payment-response.mapper';
 
 @Controller('payments')
 @UseGuards(ApiKeyGuard)
@@ -110,17 +111,6 @@ export class PaymentsController {
   }
 
   private toResponse(payment: any) {
-    return {
-      id: payment.id,
-      amount: payment.amount,
-      currency: payment.currency,
-      method: payment.method,
-      mode: payment.mode,
-      status: payment.status,
-      provider_reference: payment.provider_reference,
-      redirect_url: payment.redirect_url,
-      created_at: payment.created_at,
-      updated_at: payment.updated_at,
-    };
+    return toPaymentResponse(payment);
   }
 }

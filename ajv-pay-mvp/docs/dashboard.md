@@ -35,27 +35,32 @@ moment du build.
 - `GET /payments?limit=&offset=` — liste paginée, triée par date décroissante.
 - `GET /admin/manual-payments/pending`, `POST .../:id/confirm`, `POST .../:id/reject` — vue admin.
 
-## Limitation de sécurité connue (à corriger avant tout marchand non technique)
+## Authentification dashboard marchand — RÉSOLU (2026-07-09)
 
-Le dashboard stocke l'API Key **et le HMAC Secret** du marchand dans le
-`localStorage` du navigateur, pour pouvoir signer les requêtes PATCH côté
-client (`src/api.ts`, fonction `hmacSign`, via Web Crypto). C'est le même
-HMAC Secret que celui utilisé pour les intégrations serveur-à-serveur
-décrites dans le README principal.
+Le dashboard marchand utilise désormais un vrai login (email + mot de passe,
+table `merchant_users`) émettant un cookie de session HttpOnly
+(`merchant_sessions`, voir `migrations/010_merchant_dashboard_auth.sql`),
+vérifié par `SessionGuard` — un guard NestJS séparé d'`ApiKeyGuard`. Le
+marchand n'a plus jamais besoin de connaître son `hmac_secret` pour utiliser
+le dashboard : ce secret reste réservé à l'intégration serveur-à-serveur
+(voir README, section Authentification).
 
-Ce n'est **pas** le modèle Stripe : Stripe sépare strictement les clés
-d'API d'intégration (jamais exposées à un navigateur) d'une authentification
-dashboard dédiée (session cookie après login email/mot de passe + 2FA).
+Le cookie de session est `SameSite=None; Secure` en production (déploiement
+réellement cross-origin : dashboard sur Vercel, API sur Railway) — protection
+CSRF par header personnalisé (`X-Ajvpay-Dashboard`) sur toute requête
+mutante, voir `src/common/auth/session.guard.ts`. `CORS_ORIGIN` doit être
+une origine **exacte** côté Railway (jamais un wildcard) pour que les
+cookies fonctionnent — l'API refuse de démarrer en production sans cette
+variable.
 
-Avant d'ouvrir ce dashboard à des marchands externes non techniques :
-1. Ajouter une table `merchant_users` (email + mot de passe haché) distincte
-   des credentials d'intégration API.
-2. Remplacer l'auth du dashboard par un login classique émettant un cookie
-   de session HttpOnly, vérifié par un guard NestJS séparé d'`ApiKeyGuard`.
-3. Ne plus jamais transmettre `hmac_secret` au navigateur.
+Nouvelle surface `/dashboard/*` (login/logout, profil, webhook, paiements,
+remboursement) — distincte de `/payments/*`/`/merchants/me*` (clé API,
+intégration serveur-à-serveur), qui restent inchangées.
 
-Pour un usage interne (équipe AJV Pay testant ses propres marchands), le
-compromis actuel est acceptable et documenté ici en toute transparence.
+Hors scope, décidé explicitement : l'admin plateforme (`ADMIN_API_KEY`)
+garde son modèle actuel (clé partagée unique) — un seul utilisateur humain
+de confiance aujourd'hui, profil de risque différent. Réinitialisation de
+mot de passe : pas encore construite.
 
 La vue admin a le même type de compromis (la clé `ADMIN_API_KEY` transite
 par un champ du navigateur) mais un profil de risque différent : une seule

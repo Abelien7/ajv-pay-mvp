@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Dashboard } from './Dashboard';
 import { LoginForm } from './LoginForm';
-import { useCredentials } from './useCredentials';
+import { useSession } from './useSession';
 import { AdminDashboard } from './AdminDashboard';
 import { AdminLoginForm } from './AdminLoginForm';
 import { useAdminCredentials } from './useAdminCredentials';
 
 export default function App() {
-  const { credentials, setCredentials, clearCredentials } = useCredentials();
+  const { session, checking, setSession, clearSession } = useSession();
   const { adminCredentials, setAdminCredentials, clearAdminCredentials } = useAdminCredentials();
   const [mode, setMode] = useState<'merchant' | 'admin'>(adminCredentials ? 'admin' : 'merchant');
 
@@ -26,9 +26,13 @@ export default function App() {
     );
   }
 
-  if (!credentials) {
-    return <LoginForm onSubmit={setCredentials} onAdminClick={() => setMode('admin')} />;
+  if (checking) {
+    return null; // évite un flash du formulaire de connexion pendant la vérification de session
   }
 
-  return <Dashboard credentials={credentials} onLogout={clearCredentials} />;
+  if (!session) {
+    return <LoginForm onSuccess={setSession} onAdminClick={() => setMode('admin')} />;
+  }
+
+  return <Dashboard onLogout={clearSession} />;
 }

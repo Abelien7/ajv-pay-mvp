@@ -175,11 +175,18 @@ export class PaymentsService {
    * (soit `setProcessing` avec sa propre transaction, soit
    * `applyFinalTransition` avec la transaction de l'orchestrateur).
    *
-   * Garde-fous conservés à l'identique :
+   * Garde-fous :
    *   - transition vers le même statut → no-op (idempotence des webhooks redélivrés)
    *   - transition depuis un état déjà final → refusée (succeeded → failed
-   *     interdit, et inversement — règle explicitement demandée par la
-   *     checklist de hardening).
+   *     interdit, et inversement — règle demandée par la checklist de
+   *     hardening), SAUF succeeded → refunded : c'est la seule transition
+   *     finale→finale légitime du système (voir PaymentOrchestrator.refundPayment).
+   *     **Bug corrigé (découvert en testant un vrai remboursement contre une
+   *     vraie base, voir test/dashboard.e2e-spec.ts)** : la version
+   *     précédente de cette garde bloquait AUSSI ce cas — un remboursement
+   *     ne changeait jamais réellement le statut du paiement (silencieux,
+   *     200 OK renvoyé quand même), sans jamais avoir été détecté faute de
+   *     test qui exerçait vraiment ce chemin de bout en bout.
    */
   private async transitionCore(
     client: PoolClient,
@@ -202,7 +209,8 @@ export class PaymentsService {
       this.logger.warn(`Transition ignorée (déjà en statut ${newStatus}) pour ${paymentId}`);
       return payment;
     }
-    if (['succeeded', 'failed', 'expired', 'refunded'].includes(payment.status)) {
+    const isRefundOfSucceeded = payment.status === 'succeeded' && newStatus === 'refunded';
+    if (['succeeded', 'failed', 'expired', 'refunded'].includes(payment.status) && !isRefundOfSucceeded) {
       this.logger.warn(
         `Transition refusée : payment=${paymentId} déjà dans un état final (${payment.status})`,
       );

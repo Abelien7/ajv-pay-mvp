@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { api } from './api';
-import type { Credentials, MerchantMeResponse, PaymentDto } from './types';
+import { dashboardApi } from './dashboardApi';
+import type { MerchantMeResponse, PaymentDto } from './types';
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'En attente',
@@ -11,7 +11,7 @@ const STATUS_LABELS: Record<string, string> = {
   refunded: 'Remboursé',
 };
 
-export function Dashboard({ credentials, onLogout }: { credentials: Credentials; onLogout: () => void }) {
+export function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [me, setMe] = useState<MerchantMeResponse | null>(null);
   const [payments, setPayments] = useState<PaymentDto[]>([]);
   const [webhookUrlInput, setWebhookUrlInput] = useState('');
@@ -22,8 +22,8 @@ export function Dashboard({ credentials, onLogout }: { credentials: Credentials;
   async function load() {
     try {
       const [meResponse, paymentsResponse] = await Promise.all([
-        api.getMe(credentials),
-        api.listPayments(credentials, 20, 0),
+        dashboardApi.getMe(),
+        dashboardApi.listPayments(20, 0),
       ]);
       setMe(meResponse);
       setWebhookUrlInput(meResponse.webhook_url ?? '');
@@ -41,12 +41,20 @@ export function Dashboard({ credentials, onLogout }: { credentials: Credentials;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function handleLogout() {
+    try {
+      await dashboardApi.logout();
+    } finally {
+      onLogout();
+    }
+  }
+
   async function handleRefund(paymentId: string) {
     if (!window.confirm('Confirmer le remboursement de ce paiement ?')) return;
     setRefundingId(paymentId);
     setError(null);
     try {
-      await api.refundPayment(credentials, paymentId);
+      await dashboardApi.refundPayment(paymentId);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors du remboursement');
@@ -59,7 +67,7 @@ export function Dashboard({ credentials, onLogout }: { credentials: Credentials;
     e.preventDefault();
     setSaving(true);
     try {
-      await api.updateWebhookUrl(credentials, webhookUrlInput);
+      await dashboardApi.updateWebhookUrl(webhookUrlInput);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
@@ -74,7 +82,7 @@ export function Dashboard({ credentials, onLogout }: { credentials: Credentials;
         <h1 className="brand-title">
           AJV <span>Pay</span> — {me?.name ?? '…'}
         </h1>
-        <button onClick={onLogout} className="btn btn-secondary btn-sm">
+        <button onClick={handleLogout} className="btn btn-secondary btn-sm">
           Déconnexion
         </button>
       </div>

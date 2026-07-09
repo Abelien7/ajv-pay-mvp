@@ -8,6 +8,8 @@ import { PaymentsModule } from './payments/payments.module';
 import { AuditModule } from './audit/audit.module';
 import { OutboxModule } from './outbox/outbox.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { DashboardAuthModule } from './dashboard-auth/dashboard-auth.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { HealthController } from './health.controller';
 
 /**
@@ -35,6 +37,8 @@ import { HealthController } from './health.controller';
     PaymentsModule,
     OutboxModule,
     WebhooksModule,
+    DashboardAuthModule,
+    DashboardModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

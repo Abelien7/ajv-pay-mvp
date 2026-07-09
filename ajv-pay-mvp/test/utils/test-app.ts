@@ -1,9 +1,13 @@
 import { randomBytes } from 'crypto';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import request from 'supertest';
 import { AppModule } from '../../src/app.module';
+import { configureApp } from '../../src/configure-app';
 import { DatabaseService } from '../../src/database/database.service';
 import { computeHmacSignature, hashApiKey } from '../../src/common/auth/hmac.util';
+import { hashPassword } from '../../src/common/auth/password.util';
+import { CSRF_HEADER_NAME } from '../../src/dashboard-auth/session-cookie.constants';
 
 export interface TestMerchant {
   id: string;
@@ -22,9 +26,7 @@ export interface TestMerchant {
 export async function createTestApp(): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = moduleRef.createNestApplication();
-  app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
-  );
+  configureApp(app);
   await app.init();
   return app;
 }
@@ -36,7 +38,7 @@ export async function resetDatabase(app: INestApplication): Promise<void> {
     TRUNCATE TABLE
       webhook_attempts, outbox_events, manual_payment_proofs, ledger_entries,
       payment_events, payments, idempotency_keys, audit_logs, merchants,
-      worker_heartbeats
+      worker_heartbeats, merchant_users, merchant_sessions
     CASCADE
   `);
 }
@@ -101,4 +103,48 @@ export function signedTestModeHeaders(
     headers['Idempotency-Key'] = idempotencyKey;
   }
   return headers;
+}
+
+export interface TestDashboardUser {
+  merchantId: string;
+  email: string;
+  password: string;
+}
+
+/** Crée un marchand ET son compte de connexion dashboard (voir migrations/010_merchant_dashboard_auth.sql), mot de passe en clair connu pour les tests. */
+export async function createTestMerchantWithUser(
+  app: INestApplication,
+  name = 'Test Merchant',
+): Promise<TestMerchant & TestDashboardUser> {
+  const merchant = await createTestMerchant(app, name);
+  const db = app.get(DatabaseService);
+  const email = `${randomBytes(6).toString('hex')}@example.com`;
+  const password = 'correct-horse-battery-staple';
+
+  await db.query(
+    `INSERT INTO merchant_users (merchant_id, email, password_hash) VALUES ($1, $2, $3)`,
+    [merchant.id, email, await hashPassword(password)],
+  );
+
+  return { ...merchant, merchantId: merchant.id, email, password };
+}
+
+/**
+ * Se connecte au dashboard et retourne un agent supertest qui conserve le
+ * cookie de session entre les appels (`request()` seul ne le fait PAS —
+ * il faut `request.agent(...)` pour ça).
+ */
+export async function loginDashboard(
+  app: INestApplication,
+  email: string,
+  password: string,
+): Promise<ReturnType<typeof request.agent>> {
+  const agent = request.agent(app.getHttpServer());
+  await agent.post('/dashboard/login').send({ email, password }).expect(200);
+  return agent;
+}
+
+/** En-tête anti-CSRF exigé par SessionGuard sur toute requête mutante vers /dashboard/*. */
+export function csrfHeader(): Record<string, string> {
+  return { [CSRF_HEADER_NAME]: '1' };
 }
