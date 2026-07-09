@@ -1,10 +1,12 @@
 import { Body, Controller, HttpCode, Post, Req, Res } from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { DashboardAuthService, SESSION_DURATION_MS } from './dashboard-auth.service';
 import { LoginDto } from './dto/login.dto';
 import { SESSION_COOKIE_NAME, sessionCookieOptions } from './session-cookie.constants';
 
+@ApiExcludeController() // login/logout du dashboard humain, pas une API d'intégration tierce
 @Controller('dashboard')
 export class DashboardAuthController {
   constructor(private readonly auth: DashboardAuthService) {}

@@ -1,7 +1,10 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { CSRF_HEADER_NAME } from './dashboard-auth/session-cookie.constants';
+
+const DOCS_PATH = 'docs';
 
 /**
  * Configuration commune du process HTTP "API" — appelée à la fois par
@@ -15,7 +18,17 @@ import { CSRF_HEADER_NAME } from './dashboard-auth/session-cookie.constants';
  * élimine ce risque de divergence prod/test pour de bon.
  */
 export function configureApp(app: INestApplication): void {
-  app.use(helmet());
+  // La CSP par défaut de helmet (script-src 'self', pas d'inline) bloque le
+  // script de bootstrap inliné par Swagger UI — /docs est une page de
+  // documentation en lecture seule, sans donnée sensible ni formulaire, donc
+  // on l'exempte plutôt que d'affaiblir la CSP pour le reste de l'API.
+  const helmetMiddleware = helmet();
+  app.use((req: any, res: any, next: any) => {
+    if (req.path === `/${DOCS_PATH}` || req.path.startsWith(`/${DOCS_PATH}/`) || req.path.startsWith(`/${DOCS_PATH}-json`)) {
+      return next();
+    }
+    return helmetMiddleware(req, res, next);
+  });
   app.use(cookieParser());
 
   // '*' est traité comme "non configuré" : avec credentials: true (obligatoire
@@ -44,4 +57,40 @@ export function configureApp(app: INestApplication): void {
       transform: true,
     }),
   );
+
+  setupSwagger(app);
+}
+
+/**
+ * Documentation publique de l'API d'intégration (marchand/provider) —
+ * volontairement exposée sans authentification, comme celle de Stripe : la
+ * sécurité vient des clés API, pas du secret du schéma. N'inclut QUE les
+ * routes destinées à un intégrateur tiers — les routes admin plateforme et
+ * dashboard humain sont explicitly exclues via @ApiExcludeController() sur
+ * leurs controllers respectifs (ManualReviewController, DashboardController,
+ * DashboardAuthController), ainsi que /health et les webhooks entrants
+ * provider (jamais appelés par un marchand).
+ */
+function setupSwagger(app: INestApplication): void {
+  const config = new DocumentBuilder()
+    .setTitle('AJV Pay — API')
+    .setDescription(
+      "API de paiement mobile money (Moov Money, Mixx by Yas, paiement vérifié à la main) pour l'Afrique de l'Ouest. " +
+        'Commencez par intégrer avec une clé "test" (voir POST /merchants/register) — aucun impact financier, résolution instantanée.',
+    )
+    .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        description: "Clé API du marchand (live ou test) — voir l'en-tête Authorization: Bearer <api_key>.",
+      },
+      'api-key',
+    )
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup(DOCS_PATH, app, document, {
+    customSiteTitle: 'AJV Pay — Documentation API',
+  });
 }

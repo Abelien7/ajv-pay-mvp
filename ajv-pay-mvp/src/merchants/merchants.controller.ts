@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, Patch, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiKeyGuard } from '../common/auth/api-key.guard';
 import { CurrentMerchant } from '../common/auth/current-merchant.decorator';
 import { Merchant } from './merchant.entity';
@@ -7,6 +8,7 @@ import { LedgerService } from '../ledger/ledger.service';
 import { RegisterMerchantDto } from './dto/register-merchant.dto';
 import { UpdateWebhookUrlDto } from './dto/update-webhook-url.dto';
 
+@ApiTags('Marchands')
 @Controller('merchants')
 export class MerchantsController {
   constructor(
@@ -23,6 +25,7 @@ export class MerchantsController {
    * la paire "test" (aucun impact financier, résolution instantanée), ne
    * passer en "live" qu'une fois l'intégration validée.
    */
+  @ApiOperation({ summary: 'Crée un compte marchand (retourne les clés live + test une seule fois)' })
   @Post('register')
   @HttpCode(201)
   async register(@Body() dto: RegisterMerchantDto) {
@@ -43,6 +46,8 @@ export class MerchantsController {
   }
 
   /** Profil + solde du marchand authentifié (utilisé par le dashboard). */
+  @ApiOperation({ summary: 'Profil et solde à reverser du marchand authentifié' })
+  @ApiBearerAuth('api-key')
   @Get('me')
   @UseGuards(ApiKeyGuard)
   async getMe(@CurrentMerchant() merchant: Merchant) {
@@ -57,6 +62,8 @@ export class MerchantsController {
     };
   }
 
+  @ApiOperation({ summary: "Met à jour l'URL de notification webhook du marchand" })
+  @ApiBearerAuth('api-key')
   @Patch('me/webhook-url')
   @UseGuards(ApiKeyGuard)
   async updateWebhookUrl(@CurrentMerchant() merchant: Merchant, @Body() dto: UpdateWebhookUrlDto) {

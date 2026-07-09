@@ -1,4 +1,5 @@
 import { Controller, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
 import { AdminApiKeyGuard } from '../common/auth/admin-api-key.guard';
 import { ManualPaymentsService } from './manual-payments.service';
 import { PaymentOrchestrator } from '../orchestrator/payment-orchestrator.service';
@@ -11,6 +12,7 @@ import { Payment } from '../payments/payment.entity';
  * rejet. C'est le seul endroit du système où quelqu'un voit des paiements
  * au-delà de son propre marchand.
  */
+@ApiExcludeController() // usage interne admin plateforme, jamais un marchand
 @Controller('admin/manual-payments')
 @UseGuards(AdminApiKeyGuard)
 export class ManualReviewController {

@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiKeyGuard } from '../common/auth/api-key.guard';
 import { CurrentMerchant } from '../common/auth/current-merchant.decorator';
 import { CurrentPaymentMode } from '../common/auth/current-payment-mode.decorator';
@@ -21,6 +22,8 @@ import { ManualPaymentsService } from '../manual-payments/manual-payments.servic
 import { SubmitProofDto } from '../manual-payments/dto/submit-proof.dto';
 import { toPaymentResponse } from './payment-response.mapper';
 
+@ApiTags('Paiements')
+@ApiBearerAuth('api-key')
 @Controller('payments')
 @UseGuards(ApiKeyGuard)
 export class PaymentsController {
@@ -37,6 +40,7 @@ export class PaymentsController {
    * payload de création de paiement — ces informations sont fixes et
    * partagées par tous les paiements manuels, pas une donnée par paiement.
    */
+  @ApiOperation({ summary: 'Numéro marchand + gabarit USSD pour le paiement manuel (Moov Money, Mixx by Yas)' })
   @Get('manual/info')
   manualInfo() {
     return this.manualPayments.getAllNetworksInfo();
@@ -46,6 +50,7 @@ export class PaymentsController {
    * L'écriture (création de paiement) passe TOUJOURS par l'orchestrateur —
    * jamais directement par PaymentsService depuis un controller.
    */
+  @ApiOperation({ summary: 'Crée un paiement (idempotent via l’en-tête Idempotency-Key, obligatoire)' })
   @Post()
   async create(
     @CurrentMerchant() merchant: Merchant,
@@ -58,6 +63,7 @@ export class PaymentsController {
   }
 
   /** Liste paginée — alimente le dashboard marchand. */
+  @ApiOperation({ summary: 'Liste paginée des paiements du marchand' })
   @Get()
   async list(
     @CurrentMerchant() merchant: Merchant,
@@ -71,6 +77,7 @@ export class PaymentsController {
   }
 
   /** La lecture simple n'a pas besoin de coordination — accès direct à PaymentsService. */
+  @ApiOperation({ summary: "Statut courant d'un paiement" })
   @Get(':id')
   async getById(@CurrentMerchant() merchant: Merchant, @Param('id') id: string) {
     const payment = await this.payments.getPayment(merchant.id, id);
@@ -83,6 +90,7 @@ export class PaymentsController {
    * qui appelle le provider et commet la transition refunded + ledger + outbox
    * en une seule transaction atomique.
    */
+  @ApiOperation({ summary: "Rembourse un paiement 'succeeded'" })
   @Post(':id/refund')
   @HttpCode(200)
   async refund(@CurrentMerchant() merchant: Merchant, @Param('id') id: string) {
@@ -99,6 +107,7 @@ export class PaymentsController {
    * paiement : ça reste 'processing' jusqu'à la revue de l'admin plateforme
    * (voir ManualReviewController).
    */
+  @ApiOperation({ summary: "Soumet la référence de transaction mobile money d'un paiement 'manual'" })
   @Post(':id/submit-proof')
   @HttpCode(200)
   async submitProof(

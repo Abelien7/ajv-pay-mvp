@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
 import { DatabaseService } from './database/database.service';
 import { OutboxService } from './outbox/outbox.service';
 import { WebhooksService } from './webhooks/webhooks.service';
@@ -13,6 +14,7 @@ import { WebhooksService } from './webhooks/webhooks.service';
  */
 const WORKER_STALE_AFTER_SECONDS = 30; // 3x l'intervalle du @Cron (10s)
 
+@ApiExcludeController() // supervision opérationnelle interne, pas une API d'intégration
 @Controller('health')
 export class HealthController {
   constructor(

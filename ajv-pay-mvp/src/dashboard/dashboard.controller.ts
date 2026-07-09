@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
 import { SessionGuard } from '../common/auth/session.guard';
 import { CurrentMerchant } from '../common/auth/current-merchant.decorator';
 import { Merchant } from '../merchants/merchant.entity';
@@ -15,6 +16,7 @@ import { toPaymentResponse } from '../payments/payment-response.mapper';
  * serveur-à-serveur, voir ApiKeyGuard). Réutilise les MÊMES services que
  * ces routes-là : aucune logique métier dupliquée, seul le guard change.
  */
+@ApiExcludeController() // dashboard humain (cookie de session), pas une API d'intégration tierce
 @Controller('dashboard')
 @UseGuards(SessionGuard)
 export class DashboardController {

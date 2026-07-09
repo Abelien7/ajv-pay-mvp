@@ -9,6 +9,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { RawBodyRequest } from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
 import { Request } from 'express';
 import { PaymentOrchestrator } from '../orchestrator/payment-orchestrator.service';
 import { ConnectorService } from '../connectors/connector.service';
@@ -29,6 +30,7 @@ import { AuditLogService } from '../audit/audit-log.service';
  * jamais un échec silencieux. Si la méthode est implémentée et retourne
  * `false`, le webhook est rejeté (401) et journalisé dans audit_logs.
  */
+@ApiExcludeController() // jamais appelé par un marchand — provider uniquement, hors doc d'intégration
 @Controller('webhooks')
 export class ProviderWebhooksController {
   private readonly logger = new Logger(ProviderWebhooksController.name);
