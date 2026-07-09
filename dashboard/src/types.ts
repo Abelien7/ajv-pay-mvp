@@ -29,6 +29,19 @@ export interface MerchantMeResponse {
   is_active: boolean;
 }
 
+export interface RegisterMerchantResponse {
+  id: string;
+  name: string;
+  email: string;
+  live_api_key: string;
+  live_hmac_secret: string;
+  test_api_key: string;
+  test_hmac_secret: string;
+  is_active: boolean;
+  created_at: string;
+  _notice: string;
+}
+
 export interface AdminCredentials {
   apiBaseUrl: string;
   adminKey: string;

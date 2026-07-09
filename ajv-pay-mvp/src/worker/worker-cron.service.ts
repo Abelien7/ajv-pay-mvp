@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { DatabaseService } from '../database/database.service';
 import { OutboxProcessorService } from '../outbox/outbox-processor.service';
 import { WebhooksService } from '../webhooks/webhooks.service';
+import { AlertingService } from './alerting.service';
 
 /**
  * Seul endroit du système avec un `@Cron` en continu — vit uniquement dans
@@ -20,6 +21,7 @@ export class WorkerCronService {
     private readonly db: DatabaseService,
     private readonly outboxProcessor: OutboxProcessorService,
     private readonly webhooks: WebhooksService,
+    private readonly alerting: AlertingService,
   ) {}
 
   @Cron(CronExpression.EVERY_10_SECONDS)
@@ -35,6 +37,12 @@ export class WorkerCronService {
       await this.webhooks.processDue();
     } catch (err: any) {
       this.logger.error(`Erreur pendant le tick worker: ${err.message}`);
+    }
+
+    try {
+      await this.alerting.checkAndAlert();
+    } catch (err: any) {
+      this.logger.error(`Échec de la vérification d'alerte: ${err.message}`);
     }
   }
 

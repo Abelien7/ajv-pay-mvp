@@ -142,6 +142,41 @@ est l'écho exact de ce que le marchand a fourni à la création — c'est ce
 qui lui permet de retrouver sa propre commande sans qu'AJV Pay ait besoin
 de connaître son schéma.
 
+## Commission plateforme
+
+`PLATFORM_FEE_BPS` (points de base, ex: `200` = 2%) — **désactivée par
+défaut (0)**, choix explicite à activer, jamais une commission qui
+commencerait à être prélevée silencieusement sur un marchand déjà
+connecté. Une fois activée, un paiement `live` réussi écrit une 3ᵉ ligne
+`fees` dans le ledger (voir `LedgerService.buildSuccessEntries`) et réduit
+d'autant le montant crédité à `merchant_payable`. **Décision assumée** :
+un remboursement ne rend jamais la commission (comme la plupart des
+processeurs réels) — voir `LedgerService.buildRefundEntries`. Aucun effet
+en mode test (le ledger y est de toute façon entièrement ignoré).
+`LedgerService.getFeesBalance()` donne le total collecté.
+
+## Surveillance et alertes
+
+- `GET /health` (voir `health.controller.ts`) : file outbox non traitée,
+  livraisons webhook en attente, battement de cœur du Worker.
+- `ALERT_WEBHOOK_URL` (optionnel, désactivé si absent) : le Worker envoie
+  un webhook JSON générique (compatible Slack/Discord/tout récepteur HTTP)
+  si la file outbox ou les livraisons webhook dépassent un seuil
+  (`ALERT_OUTBOX_BACKLOG_THRESHOLD`/`ALERT_WEBHOOK_BACKLOG_THRESHOLD`,
+  défaut 20), avec un cooldown (`ALERT_COOLDOWN_MINUTES`, défaut 15) pour
+  ne pas spammer — voir `src/worker/alerting.service.ts`.
+
+## Mot de passe oublié (dashboard)
+
+Pas d'infrastructure e-mail dans ce projet, donc pas de lien de
+réinitialisation automatique : un marchand qui oublie son mot de passe
+contacte l'admin plateforme, qui le réinitialise via
+`POST /admin/merchant-users/reset-password` (`ADMIN_API_KEY`,
+`{ email, newPassword }`) — invalide au passage toutes ses sessions en
+cours. Un marchand déjà connecté peut aussi changer son mot de passe
+lui-même via `POST /dashboard/change-password` (`{ currentPassword,
+newPassword }`).
+
 ## Garanties de correctness financière
 
 - **Idempotency stricte** : `merchant_id + Idempotency-Key` ne peut jamais créer deux paiements.

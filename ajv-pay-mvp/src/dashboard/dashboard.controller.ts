@@ -2,12 +2,15 @@ import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query, UseGuards }
 import { ApiExcludeController } from '@nestjs/swagger';
 import { SessionGuard } from '../common/auth/session.guard';
 import { CurrentMerchant } from '../common/auth/current-merchant.decorator';
+import { CurrentMerchantUserId } from '../common/auth/current-merchant-user-id.decorator';
 import { Merchant } from '../merchants/merchant.entity';
 import { MerchantsService } from '../merchants/merchants.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { PaymentsService } from '../payments/payments.service';
 import { PaymentOrchestrator } from '../orchestrator/payment-orchestrator.service';
+import { DashboardAuthService } from '../dashboard-auth/dashboard-auth.service';
 import { UpdateWebhookUrlDto } from '../merchants/dto/update-webhook-url.dto';
+import { ChangePasswordDto } from '../dashboard-auth/dto/change-password.dto';
 import { toPaymentResponse } from '../payments/payment-response.mapper';
 
 /**
@@ -25,6 +28,7 @@ export class DashboardController {
     private readonly ledger: LedgerService,
     private readonly payments: PaymentsService,
     private readonly orchestrator: PaymentOrchestrator,
+    private readonly dashboardAuth: DashboardAuthService,
   ) {}
 
   @Get('me')
@@ -64,5 +68,13 @@ export class DashboardController {
     await this.payments.getPayment(merchant.id, id); // lève 404 si le paiement n'appartient pas à ce marchand
     const payment = await this.orchestrator.refundPayment(id);
     return toPaymentResponse(payment);
+  }
+
+  /** Changement de mot de passe self-service — voir DashboardAuthService.changePassword. */
+  @Post('change-password')
+  @HttpCode(200)
+  async changePassword(@CurrentMerchantUserId() merchantUserId: string, @Body() dto: ChangePasswordDto) {
+    await this.dashboardAuth.changePassword(merchantUserId, dto.currentPassword, dto.newPassword);
+    return { status: 'ok' };
   }
 }

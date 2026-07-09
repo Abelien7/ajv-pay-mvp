@@ -81,7 +81,7 @@ async function main() {
       withTransaction: async (fn: any) => fn(fakeClient),
     };
 
-    const ledger = new LedgerService(fakeDb);
+    const ledger = new LedgerService(fakeDb, { get: () => '0' } as any);
 
     // Cas valide : crédit/débit égaux
     insertedRows.length = 0;
@@ -234,7 +234,7 @@ async function main() {
     };
 
     const paymentsService = new PaymentsService(fakeDb, {} as any, new PaymentEventsService());
-    const ledgerService = new LedgerService(fakeDb);
+    const ledgerService = new LedgerService(fakeDb, { get: () => '0' } as any);
     const outboxService = new OutboxService(fakeDb);
     // Livraison webhook immédiate désactivée pour ce test (best-effort, ne
     // doit pas faire échouer la vérification de l'atomicité statut/ledger/outbox).

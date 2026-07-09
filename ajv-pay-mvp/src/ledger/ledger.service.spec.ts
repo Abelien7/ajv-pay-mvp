@@ -7,7 +7,7 @@ function makeFakeClient(): PoolClient {
 }
 
 describe('LedgerService.buildSuccessEntries', () => {
-  const ledger = new LedgerService({} as DatabaseService);
+  const ledger = new LedgerService({} as DatabaseService, { get: () => '0' } as any);
 
   it("crédite le compte provider et débite merchant_payable pour le même montant", () => {
     const lines = ledger.buildSuccessEntries(1000, 'provider_moov');
@@ -19,7 +19,7 @@ describe('LedgerService.buildSuccessEntries', () => {
 });
 
 describe('LedgerService.buildRefundEntries', () => {
-  const ledger = new LedgerService({} as DatabaseService);
+  const ledger = new LedgerService({} as DatabaseService, { get: () => '0' } as any);
 
   it('inverse exactement les lignes du succès original', () => {
     const success = ledger.buildSuccessEntries(1000, 'provider_mixx');
@@ -40,8 +40,41 @@ describe('LedgerService.buildRefundEntries', () => {
   });
 });
 
+describe('LedgerService — commission plateforme (PLATFORM_FEE_BPS)', () => {
+  const ledgerWithFee = new LedgerService({} as DatabaseService, { get: () => '200' } as any); // 2%
+
+  it('ajoute une 3e ligne "fees" et réduit merchant_payable du montant net', () => {
+    const lines = ledgerWithFee.buildSuccessEntries(10_000, 'provider_moov');
+    expect(lines).toEqual([
+      { account: 'provider_moov', direction: 'credit', amount: 10_000 },
+      { account: 'merchant_payable', direction: 'debit', amount: 9_800 },
+      { account: 'fees', direction: 'debit', amount: 200 },
+    ]);
+    // Toujours équilibré : crédit total = débit total.
+    expect(lines.filter((l) => l.direction === 'credit').reduce((s, l) => s + l.amount, 0)).toBe(
+      lines.filter((l) => l.direction === 'debit').reduce((s, l) => s + l.amount, 0),
+    );
+  });
+
+  it('un remboursement conserve la commission (ne rembourse que le net, pas de ligne "fees")', () => {
+    const lines = ledgerWithFee.buildRefundEntries(10_000, 'provider_moov');
+    expect(lines).toEqual([
+      { account: 'provider_moov', direction: 'debit', amount: 9_800 },
+      { account: 'merchant_payable', direction: 'credit', amount: 9_800 },
+    ]);
+  });
+
+  it("n'ajoute aucune ligne 'fees' quand la commission calculée est nulle (montant trop petit, arrondi à 0)", () => {
+    const lines = ledgerWithFee.buildSuccessEntries(10, 'provider_mixx'); // 2% de 10 = 0.2 → arrondi à 0
+    expect(lines).toEqual([
+      { account: 'provider_mixx', direction: 'credit', amount: 10 },
+      { account: 'merchant_payable', direction: 'debit', amount: 10 },
+    ]);
+  });
+});
+
 describe('LedgerService.writeEntries — dernière ligne de défense', () => {
-  const ledger = new LedgerService({} as DatabaseService);
+  const ledger = new LedgerService({} as DatabaseService, { get: () => '0' } as any);
 
   it("accepte et écrit des lignes équilibrées (débit total = crédit total)", async () => {
     const client = makeFakeClient();

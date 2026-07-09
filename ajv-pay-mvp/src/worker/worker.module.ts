@@ -2,9 +2,11 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { DatabaseModule } from '../database/database.module';
+import { OutboxModule } from '../outbox/outbox.module';
 import { OutboxProcessorModule } from '../outbox/outbox-processor.module';
 import { WebhooksModule } from '../webhooks/webhooks.module';
 import { WorkerCronService } from './worker-cron.service';
+import { AlertingService } from './alerting.service';
 
 /**
  * Module racine du process Worker (voir worker.ts) — délibérément séparé
@@ -20,9 +22,10 @@ import { WorkerCronService } from './worker-cron.service';
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     DatabaseModule,
+    OutboxModule,
     OutboxProcessorModule,
     WebhooksModule,
   ],
-  providers: [WorkerCronService],
+  providers: [WorkerCronService, AlertingService],
 })
 export class WorkerModule {}

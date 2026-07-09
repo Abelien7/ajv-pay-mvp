@@ -21,7 +21,7 @@ export class SessionGuard implements CanActivate {
   constructor(private readonly dashboardAuth: DashboardAuthService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const req = context.switchToHttp().getRequest<Request & { merchant?: any }>();
+    const req = context.switchToHttp().getRequest<Request & { merchant?: any; merchantUserId?: string }>();
 
     const token = req.cookies?.[SESSION_COOKIE_NAME];
     if (!token) {
@@ -32,12 +32,13 @@ export class SessionGuard implements CanActivate {
       throw new UnauthorizedException('Requête refusée (protection CSRF).');
     }
 
-    const merchant = await this.dashboardAuth.resolveSession(token);
-    if (!merchant) {
+    const resolved = await this.dashboardAuth.resolveSession(token);
+    if (!resolved) {
       throw new UnauthorizedException('Session dashboard invalide ou expirée.');
     }
 
-    req.merchant = merchant;
+    req.merchant = resolved.merchant;
+    req.merchantUserId = resolved.merchantUserId;
     return true;
   }
 }

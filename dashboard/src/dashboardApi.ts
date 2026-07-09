@@ -1,4 +1,4 @@
-import type { MerchantMeResponse, PaymentDto, PaymentListResponse } from './types';
+import type { MerchantMeResponse, PaymentDto, PaymentListResponse, RegisterMerchantResponse } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
 
@@ -57,4 +57,17 @@ export const dashboardApi = {
 
   refundPayment: (paymentId: string) =>
     request<PaymentDto>(`/dashboard/payments/${paymentId}/refund`, { method: 'POST', body: {} }),
+
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ status: string }>('/dashboard/change-password', {
+      method: 'POST',
+      body: { currentPassword, newPassword },
+    }),
+
+  /** Inscription publique — pas de session requise (voir POST /merchants/register côté backend). */
+  register: (name: string, email: string, password: string, webhookUrl?: string) =>
+    request<RegisterMerchantResponse>('/merchants/register', {
+      method: 'POST',
+      body: { name, email, password, ...(webhookUrl ? { webhookUrl } : {}) },
+    }),
 };
