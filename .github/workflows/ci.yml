@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ajv-pay-mvp
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ajvpay
+          POSTGRES_PASSWORD: ajvpay
+          POSTGRES_DB: ajvpay_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U ajvpay -d ajvpay_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # Mêmes variables que .env.test (non commité) — voir docker-compose.yml.
+    # Valeurs bidon pour Moov/Mixx : ces adapters ne sont jamais appelés par
+    # la suite e2e (seul le provider "manual" est exercé), donc aucune vraie
+    # credential n'est nécessaire ici.
+    env:
+      DATABASE_URL: postgres://ajvpay:ajvpay@localhost:5433/ajvpay_test
+      NODE_ENV: test
+      MOOV_API_BASE_URL: https://api.moov.example.com
+      MOOV_API_KEY: ci
+      MOOV_MERCHANT_CODE: ci
+      MOOV_COLLECT_PATH: /v1/collect
+      MOOV_STATUS_PATH: /v1/collect
+      MOOV_REFUND_PATH: /v1/refund
+      MOOV_WEBHOOK_SECRET: ci-moov-webhook-secret
+      MOOV_WEBHOOK_SIGNATURE_HEADER: x-moov-signature
+      MIXX_API_BASE_URL: https://api.mixx.example.com
+      MIXX_API_KEY: ci
+      MIXX_MERCHANT_CODE: ci
+      MIXX_COLLECT_PATH: /v1/collect
+      MIXX_STATUS_PATH: /v1/collect
+      MIXX_REFUND_PATH: /v1/refund
+      MIXX_WEBHOOK_SECRET: ci-mixx-webhook-secret
+      MIXX_WEBHOOK_SIGNATURE_HEADER: x-mixx-signature
+      MANUAL_PAYMENT_NUMBER_MOOV: '90000000'
+      MANUAL_PAYMENT_NUMBER_MIXX: '90000001'
+      ADMIN_API_KEY: ci-admin-key
+      WEBHOOK_MAX_ATTEMPTS: '5'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ajv-pay-mvp/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (typecheck)
+        run: npm run build
+
+      - name: Unit tests
+        run: npm test
+
+      - name: e2e tests (vraie base Postgres)
+        run: npm run test:e2e
