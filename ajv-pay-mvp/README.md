@@ -18,7 +18,7 @@ intégration ad hoc par projet.
     déclenche déjà une livraison immédiate best-effort juste après
     confirmation d'un paiement — le Worker n'est qu'un filet de sécurité,
     pas le chemin principal.
-- Trois providers de paiement, routés par `payment.method` (voir
+- Quatre providers de paiement, routés par `payment.method` (voir
   `src/connectors/connectors.module.ts`) :
   - `moov` — Moov Money (Moov Africa, ex-Flooz). Stub générique en attente
     de credentials marchand réels.
@@ -31,6 +31,13 @@ intégration ad hoc par projet.
     marchand) le confirme ou le rejette depuis une file d'attente
     centralisée regroupant tous les marchands connectés. Ne dépend
     d'aucune API tierce, fonctionne dès aujourd'hui.
+  - `cinetpay` — carte bancaire (Visa/Mastercard) via l'agrégateur CinetPay,
+    en redirection (`redirect_url`) : le client saisit sa carte sur une page
+    hébergée par CinetPay, jamais sur nos serveurs. Contrat d'API confirmé
+    via leur documentation officielle (contrairement à moov/mixx, pas un
+    stub) mais **pas encore testé en conditions réelles** — nécessite de
+    vraies clés `CINETPAY_API_KEY`/`CINETPAY_SITE_ID` (voir `.env.example`)
+    obtenues à l'ouverture d'un compte marchand CinetPay.
 - Aucune queue externe : pattern Outbox (table `outbox_events` +
   `OutboxProcessorService`) qui transforme chaque transition finale de
   paiement en notification webhook marchand (table `webhook_attempts`,
@@ -129,10 +136,13 @@ paiement — reste `processing` jusqu'à la revue admin.
 ### `GET /admin/manual-payments/pending` / `POST .../:id/confirm` / `.../:id/reject`
 File d'attente et décision admin (voir plus haut).
 
-### `POST /webhooks/moov` et `POST /webhooks/mixx`
+### `POST /webhooks/moov`, `POST /webhooks/mixx`, `POST /webhooks/cinetpay`
 Endpoints publics recevant les notifications des providers une fois leurs
 credentials réels obtenus (pas d'auth marchand ici — authenticité vérifiée
-par signature HMAC générique, voir les adapters).
+par signature HMAC générique, voir les adapters). Pour CinetPay, la
+notification elle-même n'est jamais fiable (contenu minimal, pas de
+signature) : l'adapter rappelle systématiquement leur endpoint de
+vérification avant toute transition (`confirmViaStatusCheck`).
 
 ### Webhook sortant (vers le marchand)
 `POST <merchant.webhook_url>` avec `{ event, payment_id, merchant_id,

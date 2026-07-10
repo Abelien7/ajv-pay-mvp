@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { MoovAdapter } from './adapters/moov.adapter';
 import { MixxAdapter } from './adapters/mixx.adapter';
 import { ManualAdapter } from './adapters/manual.adapter';
+import { CinetpayAdapter } from './adapters/cinetpay.adapter';
 import { TestModeAdapter } from './adapters/test-mode.adapter';
 import { PAYMENT_ADAPTER_REGISTRY } from './connector.token';
 import { PaymentProviderAdapter, ProviderName } from './connector.interface';
@@ -30,6 +31,7 @@ import { ConnectorService } from './connector.service';
     MoovAdapter,
     MixxAdapter,
     ManualAdapter,
+    CinetpayAdapter,
     TestModeAdapter,
     ConnectorService,
     {
@@ -38,15 +40,17 @@ import { ConnectorService } from './connector.service';
         moov: MoovAdapter,
         mixx: MixxAdapter,
         manual: ManualAdapter,
+        cinetpay: CinetpayAdapter,
       ): Map<ProviderName, PaymentProviderAdapter> => {
         const entries: Array<[ProviderName, PaymentProviderAdapter]> = [
           ['moov', moov],
           ['mixx', mixx],
           ['manual', manual],
+          ['cinetpay', cinetpay],
         ];
         return new Map<ProviderName, PaymentProviderAdapter>(entries);
       },
-      inject: [MoovAdapter, MixxAdapter, ManualAdapter],
+      inject: [MoovAdapter, MixxAdapter, ManualAdapter, CinetpayAdapter],
     },
   ],
   exports: [PAYMENT_ADAPTER_REGISTRY, ConnectorService],

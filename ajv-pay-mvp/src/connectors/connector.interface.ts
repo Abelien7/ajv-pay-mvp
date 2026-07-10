@@ -6,7 +6,7 @@
  * provider en ajoutant un seul fichier adapter, sans toucher à
  * `PaymentsService` ni à `PaymentOrchestrator`.
  */
-export type ProviderName = 'moov' | 'mixx' | 'manual';
+export type ProviderName = 'moov' | 'mixx' | 'manual' | 'cinetpay';
 
 export interface InitiateParams {
   paymentId: string;

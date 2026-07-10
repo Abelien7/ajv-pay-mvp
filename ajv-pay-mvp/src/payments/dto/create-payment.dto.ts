@@ -16,8 +16,8 @@ export class CreatePaymentDto {
   @IsString()
   currency?: string = 'XOF';
 
-  @IsIn(['moov', 'mixx', 'manual'])
-  method!: 'moov' | 'mixx' | 'manual';
+  @IsIn(['moov', 'mixx', 'manual', 'cinetpay'])
+  method!: 'moov' | 'mixx' | 'manual' | 'cinetpay';
 
   @IsString()
   @Matches(/^\+?[0-9]{8,15}$/, {

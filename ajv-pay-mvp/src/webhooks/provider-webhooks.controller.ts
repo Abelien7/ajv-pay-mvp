@@ -63,6 +63,17 @@ export class ProviderWebhooksController {
     return { received: true };
   }
 
+  @Post('cinetpay')
+  @HttpCode(200)
+  async handleCinetpayWebhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Body() body: unknown,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    await this.handle('cinetpay', req, body, headers);
+    return { received: true };
+  }
+
   private async handle(
     provider: ProviderName,
     req: RawBodyRequest<Request>,
