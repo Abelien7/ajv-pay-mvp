@@ -43,6 +43,7 @@ export function Landing({
         <div className="nav-links">
           <a href="#comment-ca-marche">Comment ça marche</a>
           <a href="#securite">Sécurité</a>
+          <a href="#ajv-card">AJV Card</a>
           <a href={API_DOCS_URL} target="_blank" rel="noreferrer">
             Documentation API
           </a>
@@ -146,6 +147,59 @@ export function Landing({
         </div>
       </section>
 
+      <section id="ajv-card" className="site-section site-section-alt">
+        <span className="eyebrow" style={{ display: 'block', textAlign: 'center' }}>
+          Vision 2027–2031
+        </span>
+        <h2 className="section-heading">Demain, une carte AJV Pay</h2>
+        <p
+          style={{
+            maxWidth: 680,
+            margin: '0 auto 40px',
+            textAlign: 'center',
+            opacity: 0.85,
+          }}
+        >
+          Au-delà du mobile money, AJV Pay travaille à un réseau de cartes de paiement pensé pour
+          l'Afrique de l'Ouest — pour que vos clients puissent payer par carte, au même endroit
+          qu'ils gèrent déjà leur mobile money.
+        </p>
+        <div className="trust-grid">
+          <div className="trust-card">
+            <h3>Adossée à votre mobile money</h3>
+            <p>
+              Une carte reliée directement à Moov Money, Mixx by Yas et aux autres portefeuilles
+              mobile money de la région — pas besoin d'être déjà bancarisé pour en profiter.
+            </p>
+          </div>
+          <div className="trust-card">
+            <h3>Des frais pensés pour rester en Afrique</h3>
+            <p>
+              L'objectif : des commissions nettement plus basses que les réseaux internationaux,
+              pour que la valeur créée reste chez les commerçants et les banques de la région.
+            </p>
+          </div>
+          <div className="trust-card">
+            <h3>Construite avec de vraies banques partenaires</h3>
+            <p>
+              En dialogue avec des banques et institutions de l'UEMOA pour une émission conforme
+              aux règles de la BCEAO, étape par étape.
+            </p>
+          </div>
+        </div>
+        <p
+          style={{
+            textAlign: 'center',
+            marginTop: 32,
+            opacity: 0.7,
+            fontSize: 14,
+          }}
+        >
+          Ce projet est en phase de construction et de dialogue réglementaire — aucune carte n'est
+          disponible à ce jour.
+        </p>
+      </section>
+
       {news.length > 0 ? (
         <section className="site-section">
           <h2 className="section-heading">Actualités</h2>
@@ -188,6 +242,7 @@ export function Landing({
             <h4>Produit</h4>
             <a href="#comment-ca-marche">Comment ça marche</a>
             <a href="#securite">Sécurité</a>
+            <a href="#ajv-card">AJV Card</a>
             <a href={API_DOCS_URL} target="_blank" rel="noreferrer">
               Documentation API
             </a>
