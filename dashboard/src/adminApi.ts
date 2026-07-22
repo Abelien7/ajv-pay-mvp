@@ -1,5 +1,6 @@
 import type {
   AdminCredentials,
+  CardFeature,
   ListItem,
   NewsPost,
   PendingManualPayment,
@@ -44,6 +45,13 @@ export interface NewsPostPayload {
   body?: string;
   imageUrl?: string;
   isPublished?: boolean;
+}
+
+export interface CardFeaturePayload {
+  title?: string;
+  body?: string;
+  isActive?: boolean;
+  displayOrder?: number;
 }
 
 export const adminApi = {
@@ -94,4 +102,21 @@ export const adminApi = {
 
   deleteNetwork: (creds: AdminCredentials, id: string) =>
     adminRequest(creds, `/admin/site-content/networks/${id}`, { method: 'DELETE' }),
+
+  // ----- Contenu du site : piliers AJV Card -----
+
+  listCardFeatures: (creds: AdminCredentials) =>
+    adminRequest<CardFeature[]>(creds, '/admin/site-content/card-features'),
+
+  createCardFeature: (creds: AdminCredentials, payload: CardFeaturePayload) =>
+    adminRequest<CardFeature>(creds, '/admin/site-content/card-features', { method: 'POST', body: payload }),
+
+  updateCardFeature: (creds: AdminCredentials, id: string, payload: CardFeaturePayload) =>
+    adminRequest<CardFeature>(creds, `/admin/site-content/card-features/${id}`, {
+      method: 'PATCH',
+      body: payload,
+    }),
+
+  deleteCardFeature: (creds: AdminCredentials, id: string) =>
+    adminRequest(creds, `/admin/site-content/card-features/${id}`, { method: 'DELETE' }),
 };

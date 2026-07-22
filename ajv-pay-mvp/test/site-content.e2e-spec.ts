@@ -39,6 +39,13 @@ describe('Contenu du site vitrine (e2e)', () => {
     });
   });
 
+  describe('Données de départ (migration 013)', () => {
+    it('les 3 piliers AJV Card sont actifs', async () => {
+      const res = await request(app.getHttpServer()).get('/site-content/card-features').expect(200);
+      expect(res.body.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
   describe('Lecture publique', () => {
     it('ne renvoie pas les actualités non publiées', async () => {
       const create = await request(app.getHttpServer())
@@ -121,6 +128,32 @@ describe('Contenu du site vitrine (e2e)', () => {
         .set(adminAuth())
         .send({ name: 'peu importe' });
       expect(res.status).toBe(404);
+    });
+
+    it('crée, modifie puis supprime un pilier AJV Card', async () => {
+      const title = uniqueName('pilier');
+      const create = await request(app.getHttpServer())
+        .post('/admin/site-content/card-features')
+        .set(adminAuth())
+        .send({ title, body: 'description du pilier' });
+      expect(create.status).toBe(201);
+      const id = create.body.id;
+
+      const update = await request(app.getHttpServer())
+        .patch(`/admin/site-content/card-features/${id}`)
+        .set(adminAuth())
+        .send({ isActive: false });
+      expect(update.status).toBe(200);
+      expect(update.body.is_active).toBe(false);
+      expect(update.body.title).toBe(title); // inchangé, non fourni dans le PATCH
+
+      const publicList = await request(app.getHttpServer()).get('/site-content/card-features').expect(200);
+      expect(publicList.body.some((f: { id: string }) => f.id === id)).toBe(false);
+
+      const del = await request(app.getHttpServer())
+        .delete(`/admin/site-content/card-features/${id}`)
+        .set(adminAuth());
+      expect(del.status).toBe(200);
     });
   });
 });

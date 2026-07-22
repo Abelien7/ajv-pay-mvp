@@ -4,6 +4,7 @@ import { AdminApiKeyGuard } from '../common/auth/admin-api-key.guard';
 import { SiteContentService } from './site-content.service';
 import { CreateNewsPostDto, UpdateNewsPostDto } from './dto/news-post.dto';
 import { CreateListItemDto, UpdateListItemDto } from './dto/list-item.dto';
+import { CreateCardFeatureDto, UpdateCardFeatureDto } from './dto/card-feature.dto';
 
 /**
  * Gestion du contenu du site vitrine par l'admin plateforme (AdminApiKeyGuard) —
@@ -80,5 +81,27 @@ export class AdminSiteContentController {
   @Delete('networks/:id')
   deleteNetwork(@Param('id') id: string) {
     return this.siteContent.deleteNetwork(id);
+  }
+
+  // ----- Section "AJV Card" (vision carte bancaire) -----
+
+  @Get('card-features')
+  listCardFeatures() {
+    return this.siteContent.listAllCardFeatures();
+  }
+
+  @Post('card-features')
+  createCardFeature(@Body() dto: CreateCardFeatureDto) {
+    return this.siteContent.createCardFeature(dto);
+  }
+
+  @Patch('card-features/:id')
+  updateCardFeature(@Param('id') id: string, @Body() dto: UpdateCardFeatureDto) {
+    return this.siteContent.updateCardFeature(id, dto);
+  }
+
+  @Delete('card-features/:id')
+  deleteCardFeature(@Param('id') id: string) {
+    return this.siteContent.deleteCardFeature(id);
   }
 }

@@ -1,4 +1,4 @@
-import type { ListItem, NewsPost } from './types';
+import type { CardFeature, ListItem, NewsPost } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
 
@@ -16,6 +16,11 @@ export const siteContentApi = {
   },
   async listNetworks(): Promise<ListItem[]> {
     const res = await fetch(`${API_BASE_URL}/site-content/networks`);
+    if (!res.ok) return [];
+    return res.json();
+  },
+  async listCardFeatures(): Promise<CardFeature[]> {
+    const res = await fetch(`${API_BASE_URL}/site-content/card-features`);
     if (!res.ok) return [];
     return res.json();
   },

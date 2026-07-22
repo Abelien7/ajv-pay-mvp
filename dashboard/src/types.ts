@@ -88,3 +88,14 @@ export interface ListItem {
   display_order: number;
   created_at: string;
 }
+
+/** Un pilier de la section "AJV Card" de la vitrine (voir SiteContentService, backend). */
+export interface CardFeature {
+  id: string;
+  title: string;
+  body: string;
+  is_active: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}

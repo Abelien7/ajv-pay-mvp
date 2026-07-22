@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { siteContentApi } from './siteContentApi';
-import type { ListItem, NewsPost } from './types';
+import type { CardFeature, ListItem, NewsPost } from './types';
 
 const API_DOCS_URL = 'https://ajv-pay-mvp-production.up.railway.app/docs';
 
@@ -19,11 +19,13 @@ export function Landing({
   const [countries, setCountries] = useState<ListItem[]>([]);
   const [networks, setNetworks] = useState<ListItem[]>([]);
   const [news, setNews] = useState<NewsPost[]>([]);
+  const [cardFeatures, setCardFeatures] = useState<CardFeature[]>([]);
 
   useEffect(() => {
     siteContentApi.listCountries().then(setCountries);
     siteContentApi.listNetworks().then(setNetworks);
     siteContentApi.listNews().then(setNews);
+    siteContentApi.listCardFeatures().then(setCardFeatures);
   }, []);
 
   const networkNames = networks.map((n) => n.name);
@@ -165,27 +167,12 @@ export function Landing({
           qu'ils gèrent déjà leur mobile money.
         </p>
         <div className="trust-grid">
-          <div className="trust-card">
-            <h3>Adossée à votre mobile money</h3>
-            <p>
-              Une carte reliée directement à Moov Money, Mixx by Yas et aux autres portefeuilles
-              mobile money de la région — pas besoin d'être déjà bancarisé pour en profiter.
-            </p>
-          </div>
-          <div className="trust-card">
-            <h3>Des frais pensés pour rester en Afrique</h3>
-            <p>
-              L'objectif : des commissions nettement plus basses que les réseaux internationaux,
-              pour que la valeur créée reste chez les commerçants et les banques de la région.
-            </p>
-          </div>
-          <div className="trust-card">
-            <h3>Construite avec de vraies banques partenaires</h3>
-            <p>
-              En dialogue avec des banques et institutions de l'UEMOA pour une émission conforme
-              aux règles de la BCEAO, étape par étape.
-            </p>
-          </div>
+          {cardFeatures.map((feature) => (
+            <div key={feature.id} className="trust-card">
+              <h3>{feature.title}</h3>
+              <p>{feature.body}</p>
+            </div>
+          ))}
         </div>
         <p
           style={{

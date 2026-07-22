@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { CreateNewsPostDto, UpdateNewsPostDto } from './dto/news-post.dto';
 import { CreateListItemDto, UpdateListItemDto } from './dto/list-item.dto';
+import { CreateCardFeatureDto, UpdateCardFeatureDto } from './dto/card-feature.dto';
 
 export interface NewsPost {
   id: string;
@@ -20,6 +21,16 @@ export interface ListItem {
   is_active: boolean;
   display_order: number;
   created_at: Date;
+}
+
+export interface CardFeature {
+  id: string;
+  title: string;
+  body: string;
+  is_active: boolean;
+  display_order: number;
+  created_at: Date;
+  updated_at: Date;
 }
 
 type ListTable = 'covered_countries' | 'payment_networks';
@@ -51,6 +62,13 @@ export class SiteContentService {
 
   listActiveNetworks(): Promise<ListItem[]> {
     return this.listActive('payment_networks');
+  }
+
+  async listActiveCardFeatures(): Promise<CardFeature[]> {
+    const { rows } = await this.db.query<CardFeature>(
+      `SELECT * FROM ajv_card_features WHERE is_active = TRUE ORDER BY display_order ASC, created_at ASC`,
+    );
+    return rows;
   }
 
   private async listActive(table: ListTable): Promise<ListItem[]> {
@@ -133,6 +151,47 @@ export class SiteContentService {
   }
   async deleteNetwork(id: string): Promise<void> {
     return this.deleteListItem('payment_networks', id);
+  }
+
+  async listAllCardFeatures(): Promise<CardFeature[]> {
+    const { rows } = await this.db.query<CardFeature>(
+      `SELECT * FROM ajv_card_features ORDER BY display_order ASC, created_at ASC`,
+    );
+    return rows;
+  }
+
+  async createCardFeature(dto: CreateCardFeatureDto): Promise<CardFeature> {
+    const { rows } = await this.db.query<CardFeature>(
+      `INSERT INTO ajv_card_features (title, body, is_active, display_order) VALUES ($1, $2, $3, $4) RETURNING *`,
+      [dto.title, dto.body, dto.isActive ?? true, dto.displayOrder ?? 0],
+    );
+    return rows[0];
+  }
+
+  async updateCardFeature(id: string, dto: UpdateCardFeatureDto): Promise<CardFeature> {
+    const existing = await this.getCardFeatureById(id);
+    const { rows } = await this.db.query<CardFeature>(
+      `UPDATE ajv_card_features SET title = $2, body = $3, is_active = $4, display_order = $5 WHERE id = $1 RETURNING *`,
+      [
+        id,
+        dto.title ?? existing.title,
+        dto.body ?? existing.body,
+        dto.isActive ?? existing.is_active,
+        dto.displayOrder ?? existing.display_order,
+      ],
+    );
+    return rows[0];
+  }
+
+  async deleteCardFeature(id: string): Promise<void> {
+    await this.getCardFeatureById(id);
+    await this.db.query(`DELETE FROM ajv_card_features WHERE id = $1`, [id]);
+  }
+
+  private async getCardFeatureById(id: string): Promise<CardFeature> {
+    const { rows } = await this.db.query<CardFeature>(`SELECT * FROM ajv_card_features WHERE id = $1`, [id]);
+    if (!rows[0]) throw new NotFoundException(`Élément ${id} introuvable dans ajv_card_features.`);
+    return rows[0];
   }
 
   private async listAll(table: ListTable): Promise<ListItem[]> {

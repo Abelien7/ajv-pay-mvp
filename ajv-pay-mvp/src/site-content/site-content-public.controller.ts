@@ -25,4 +25,9 @@ export class SiteContentPublicController {
   listNetworks() {
     return this.siteContent.listActiveNetworks();
   }
+
+  @Get('card-features')
+  listCardFeatures() {
+    return this.siteContent.listActiveCardFeatures();
+  }
 }
