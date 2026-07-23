@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { IdempotencyService } from '../common/idempotency/idempotency.service';
@@ -53,7 +53,7 @@ export class PaymentsService {
     idempotencyKey: string,
   ): Promise<Payment> {
     if (!idempotencyKey) {
-      throw new Error('Idempotency-Key est obligatoire pour créer un paiement.');
+      throw new BadRequestException('Idempotency-Key est obligatoire pour créer un paiement.');
     }
     const merchantId = merchant.id;
 
@@ -110,6 +110,38 @@ export class PaymentsService {
     return this.db.withTransaction((client) =>
       this.transitionCore(client, paymentId, 'processing'),
     );
+  }
+
+  /**
+   * Réclame atomiquement le droit de rembourser ce paiement, AVANT tout
+   * appel réseau au provider — évite un double remboursement réel si deux
+   * requêtes `POST /payments/:id/refund` arrivent en concurrence (double-clic,
+   * retry réseau côté marchand) : seule une des deux `UPDATE ... WHERE
+   * refund_claimed_at IS NULL` peut affecter une ligne, l'autre reçoit 0 ligne
+   * et n'appelle jamais le provider. Un simple `UPDATE` conditionnel est déjà
+   * atomique en PostgreSQL, pas besoin de `SELECT ... FOR UPDATE` séparé.
+   * Voir migrations/014_refund_claim.sql.
+   */
+  async claimRefund(paymentId: string): Promise<Payment | null> {
+    const { rows } = await this.db.query<Payment>(
+      `UPDATE payments SET refund_claimed_at = NOW()
+       WHERE id = $1 AND status = 'succeeded' AND refund_claimed_at IS NULL
+       RETURNING *`,
+      [paymentId],
+    );
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Libère la réclamation posée par `claimRefund` — appelé uniquement si
+   * l'appel provider échoue ou est refusé, pour qu'un nouvel essai (ex:
+   * après correction d'une erreur de configuration) reste possible. Ne
+   * JAMAIS appeler après un remboursement réussi : le statut passe à
+   * `refunded` (final), qui bloque déjà toute nouvelle réclamation via le
+   * garde `status = 'succeeded'` ci-dessus.
+   */
+  async releaseRefundClaim(paymentId: string): Promise<void> {
+    await this.db.query(`UPDATE payments SET refund_claimed_at = NULL WHERE id = $1`, [paymentId]);
   }
 
   /**

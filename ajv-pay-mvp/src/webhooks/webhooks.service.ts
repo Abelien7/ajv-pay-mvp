@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { MerchantsService } from '../merchants/merchants.service';
 import { Payment } from '../payments/payment.entity';
 import { computeHmacSignature } from '../common/auth/hmac.util';
+import { assertPublicWebhookUrl } from './ssrf-guard';
 
 interface WebhookAttemptRow {
   id: string;
@@ -48,6 +50,29 @@ export class WebhooksService {
    * intermédiaire.
    */
   async enqueue(payment: Payment): Promise<void> {
+    await this.doEnqueue(payment, (sql, params) => this.db.query(sql, params));
+  }
+
+  /**
+   * Variante transactionnelle d'`enqueue`, utilisée par
+   * `OutboxProcessorService` — l'INSERT doit participer à la MÊME
+   * transaction que la réclamation de l'événement outbox
+   * (`OutboxService.claimNext`/`markProcessedInTransaction`) : si l'INSERT
+   * se faisait sur une connexion séparée et réussissait, puis que le
+   * marquage "traité" échouait pour une autre raison, le prochain passage
+   * réessaierait l'événement et créerait une DEUXIÈME tentative de webhook
+   * pour le même paiement — exactement le double envoi qu'on cherche à
+   * éliminer, juste déplacé d'une course entre process à une course entre
+   * connexions.
+   */
+  async enqueueInTransaction(client: PoolClient, payment: Payment): Promise<void> {
+    await this.doEnqueue(payment, (sql, params) => client.query(sql, params));
+  }
+
+  private async doEnqueue(
+    payment: Payment,
+    exec: (sql: string, params: unknown[]) => Promise<unknown>,
+  ): Promise<void> {
     const merchant = await this.merchants.findById(payment.merchant_id);
     const url = (merchant as any)?.webhook_url;
 
@@ -72,7 +97,7 @@ export class WebhooksService {
       metadata: payment.metadata,
     };
 
-    await this.db.query(
+    await exec(
       `INSERT INTO webhook_attempts (merchant_id, payment_id, url, payload, status, next_retry_at)
        VALUES ($1, $2, $3, $4, 'pending', NOW())`,
       [payment.merchant_id, payment.id, url, JSON.stringify(payload)],
@@ -97,17 +122,42 @@ export class WebhooksService {
     };
   }
 
+  /**
+   * Traite jusqu'à 50 tentatives dues, une par une, chacune réclamée
+   * atomiquement avant l'appel réseau (voir migrations/015_webhook_attempt_claim.sql).
+   * Sans ça, le process API (livraison immédiate après chaque transition)
+   * et le process Worker (@Cron 10s) pouvaient tous deux lire la même
+   * ligne `pending` et livrer le même webhook deux fois au marchand — un
+   * marchand qui traite la notification de façon non idempotente (ex:
+   * décrément de stock) agirait alors deux fois pour un seul paiement.
+   * Le bail de 2 minutes (`claimed_at < NOW() - INTERVAL '2 minutes'`) est
+   * un filet de sécurité si un process crashe entre la réclamation et la
+   * mise à jour du statut final — sans lui, une tentative réclamée par un
+   * process mort resterait bloquée indéfiniment.
+   */
   async processDue(): Promise<void> {
-    const { rows } = await this.db.query<WebhookAttemptRow>(
-      `SELECT * FROM webhook_attempts
-       WHERE status = 'pending' AND next_retry_at <= NOW()
-       ORDER BY next_retry_at ASC
-       LIMIT 50`,
-    );
-
-    for (const attempt of rows) {
+    for (let i = 0; i < 50; i++) {
+      const attempt = await this.claimNextDue();
+      if (!attempt) return;
       await this.attemptDelivery(attempt);
     }
+  }
+
+  private async claimNextDue(): Promise<WebhookAttemptRow | null> {
+    const { rows } = await this.db.query<WebhookAttemptRow>(
+      `UPDATE webhook_attempts SET claimed_at = NOW()
+       WHERE id = (
+         SELECT id FROM webhook_attempts
+         WHERE status = 'pending'
+           AND next_retry_at <= NOW()
+           AND (claimed_at IS NULL OR claimed_at < NOW() - INTERVAL '2 minutes')
+         ORDER BY next_retry_at ASC
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED
+       )
+       RETURNING *`,
+    );
+    return rows[0] ?? null;
   }
 
   private async attemptDelivery(attempt: WebhookAttemptRow): Promise<void> {
@@ -118,6 +168,10 @@ export class WebhooksService {
     const signature = computeHmacSignature(merchant.hmac_secret, body);
 
     try {
+      // Revérifié à CHAQUE tentative (pas seulement à l'enregistrement de
+      // l'URL) — voir ssrf-guard.ts pour le raisonnement complet.
+      await assertPublicWebhookUrl(attempt.url);
+
       const res = await fetch(attempt.url, {
         method: 'POST',
         headers: {
@@ -125,6 +179,9 @@ export class WebhooksService {
           'X-Signature': signature,
         },
         body,
+        // Un endpoint marchand qui ne répond jamais bloquerait sinon cette
+        // tentative indéfiniment (aucun timeout par défaut sur fetch).
+        signal: AbortSignal.timeout(15_000),
       });
 
       if (res.ok) {

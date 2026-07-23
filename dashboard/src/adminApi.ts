@@ -5,6 +5,7 @@ import type {
   NewsPost,
   PendingManualPayment,
 } from './types';
+import { friendlyApiError } from './apiError';
 
 /**
  * Auth admin distincte du client marchand (`api.ts`) : une simple clé
@@ -28,7 +29,7 @@ async function adminRequest<T>(
   });
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`${response.status} ${response.statusText}: ${text}`);
+    throw new Error(friendlyApiError(response.status, text, 'Une erreur est survenue'));
   }
   return response.json() as Promise<T>;
 }

@@ -1,4 +1,5 @@
 import type { MerchantMeResponse, PaymentDto, PaymentListResponse, RegisterMerchantResponse } from './types';
+import { friendlyApiError } from './apiError';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
 
@@ -36,7 +37,7 @@ async function request<T>(
 
   if (!response.ok) {
     const text = await response.text().catch(() => '');
-    throw new DashboardApiError(response.status, text || response.statusText);
+    throw new DashboardApiError(response.status, friendlyApiError(response.status, text, 'Une erreur est survenue'));
   }
   return response.json() as Promise<T>;
 }

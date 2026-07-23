@@ -180,7 +180,16 @@ function NewsSection({ credentials }: { credentials: AdminCredentials }) {
                 <span className="payment-meta">{new Date(item.created_at).toLocaleString('fr-FR')}</span>
               </div>
               <p style={{ margin: '8px 0' }}>{item.body}</p>
-              {item.image_url && <p className="payment-meta">Image : {item.image_url}</p>}
+              {item.image_url && (
+                <img
+                  src={item.image_url}
+                  alt={item.title}
+                  style={{ maxWidth: 240, maxHeight: 140, borderRadius: 8, display: 'block', marginBottom: 8 }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              )}
               <div className="actions-row">
                 <button
                   onClick={() => togglePublish(item)}
@@ -232,7 +241,14 @@ function CardFeatureSection({ credentials }: { credentials: AdminCredentials }) 
     setCreating(true);
     setError(null);
     try {
-      await adminApi.createCardFeature(credentials, { title, body, displayOrder: items.length });
+      // Créé INACTIF par défaut, comme les actualités ("en brouillon") —
+      // un pilier est un texte éditorial (positionnement, promesses
+      // implicites) qui mérite une relecture avant d'apparaître sur la
+      // vitrine publique, contrairement à un simple pays/réseau (juste un
+      // nom). Sans ça, un admin habitué au réflexe "actus = brouillon
+      // d'abord" pouvait publier par erreur un texte non relu directement
+      // sur la page d'accueil.
+      await adminApi.createCardFeature(credentials, { title, body, isActive: false, displayOrder: items.length });
       setTitle('');
       setBody('');
       await load();
@@ -288,7 +304,7 @@ function CardFeatureSection({ credentials }: { credentials: AdminCredentials }) 
             <textarea value={body} onChange={(e) => setBody(e.target.value)} required rows={3} />
           </label>
           <button type="submit" disabled={creating} className="btn btn-primary btn-block">
-            {creating ? 'Ajout…' : 'Ajouter'}
+            {creating ? 'Ajout…' : 'Ajouter (en brouillon)'}
           </button>
         </form>
       </div>
@@ -305,7 +321,7 @@ function CardFeatureSection({ credentials }: { credentials: AdminCredentials }) 
                 <div>
                   <strong>{item.title}</strong>{' '}
                   <span className={`badge ${item.is_active ? 'badge-succeeded' : 'badge-processing'}`}>
-                    {item.is_active ? 'Actif' : 'Inactif'}
+                    {item.is_active ? 'Publié' : 'Brouillon'}
                   </span>
                 </div>
               </div>
@@ -316,7 +332,7 @@ function CardFeatureSection({ credentials }: { credentials: AdminCredentials }) 
                   disabled={busyId === item.id}
                   className="btn btn-secondary btn-sm"
                 >
-                  {item.is_active ? 'Désactiver' : 'Activer'}
+                  {item.is_active ? 'Repasser en brouillon' : 'Publier'}
                 </button>
                 <button
                   onClick={() => handleDelete(item)}
@@ -417,14 +433,16 @@ function ListItemSection({
 
       <div className="card" style={{ marginBottom: 16 }}>
         <h3 className="section-title" style={{ marginTop: 0 }}>Ajouter un {singular}</h3>
-        <form onSubmit={handleCreate} className="form-row" style={{ display: 'flex', gap: 8 }}>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={`Nom du ${singular}`}
-            required
-            style={{ flex: 1 }}
-          />
+        <form onSubmit={handleCreate} className="form-row" style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+          <label className="field" style={{ flex: 1 }}>
+            {`Nom du ${singular}`}
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={`Nom du ${singular}`}
+              required
+            />
+          </label>
           <button type="submit" disabled={creating} className="btn btn-primary">
             {creating ? '…' : 'Ajouter'}
           </button>

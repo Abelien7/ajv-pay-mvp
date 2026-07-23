@@ -94,7 +94,9 @@ export class MoovAdapter implements PaymentProviderAdapter {
     const providerReference: string = payload?.reference ?? payload?.transaction_id;
 
     const mapped = this.mapStatus(providerStatus);
-    const status: WebhookParseResult['status'] = mapped === 'processing' || mapped === undefined ? 'failed' : mapped;
+    // Statut intermédiaire (PENDING/PROCESSING) ou non reconnu : jamais une
+    // transition finale (voir le commentaire sur WebhookParseResult.status).
+    const status: WebhookParseResult['status'] = mapped ?? 'processing';
 
     return { providerReference, status, raw: payload };
   }

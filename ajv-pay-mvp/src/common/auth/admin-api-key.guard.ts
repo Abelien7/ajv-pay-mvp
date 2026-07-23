@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
+import { safeCompare } from './hmac.util';
 
 /**
  * Authentifie l'admin plateforme AJV Pay (toi) — distinct des marchands
@@ -22,7 +23,7 @@ export class AdminApiKeyGuard implements CanActivate {
     }
 
     const authHeader = req.headers['authorization'];
-    if (typeof authHeader !== 'string' || authHeader !== `Bearer ${expected}`) {
+    if (typeof authHeader !== 'string' || !safeCompare(authHeader, `Bearer ${expected}`)) {
       throw new UnauthorizedException('Clé admin invalide.');
     }
     return true;

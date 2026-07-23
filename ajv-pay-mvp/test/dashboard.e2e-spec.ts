@@ -64,8 +64,14 @@ describe('Surface /dashboard/* (e2e)', () => {
     const res = await agent.get('/dashboard/payments').send();
     expect(res.status).toBe(200);
     expect(res.body.total).toBe(1);
-    // BIGINT Postgres → toujours une chaîne côté driver pg, jamais un number (comportement déjà connu, voir types.ts côté dashboard).
-    expect(Number(res.body.items[0].amount)).toBe(2000);
+    // `payments.amount` est un BIGINT Postgres — sans le type parser global
+    // (voir database.service.ts), le driver `pg` le renvoie en string, ce
+    // qui cassait silencieusement toute comparaison stricte côté intégrateur
+    // (`payload.amount === 2000` aurait été faux). Vérifie que c'est bien un
+    // number JSON réel (`"amount":2000`, pas `"amount":"2000"`), pas juste
+    // une valeur numériquement égale une fois convertie.
+    expect(res.body.items[0].amount).toBe(2000);
+    expect(typeof res.body.items[0].amount).toBe('number');
   });
 
   it('POST /dashboard/payments/:id/refund rembourse un paiement réussi', async () => {
@@ -100,6 +106,43 @@ describe('Surface /dashboard/* (e2e)', () => {
       [paymentId],
     );
     expect(rows).toHaveLength(0);
+  });
+
+  it('deux remboursements concurrents sur le même paiement : un seul aboutit (pas de double remboursement)', async () => {
+    // Reproduit un double-clic marchand ou un retry réseau côté client :
+    // deux requêtes POST /refund quasi simultanées sur le MÊME paiement.
+    // Avant la réclamation atomique (voir migrations/014_refund_claim.sql,
+    // PaymentsService.claimRefund), les deux passaient la vérification de
+    // statut avant qu'aucune n'ait committé sa transition — les deux
+    // auraient appelé connector.refund(), un double remboursement RÉEL
+    // côté provider une fois Moov/Mixx branchés avec une vraie API de
+    // remboursement.
+    const body = {
+      amount: 5000,
+      currency: 'XOF',
+      method: 'moov',
+      phoneNumber: '+22890007777',
+      metadata: { network: 'moov' },
+    };
+    const createRes = await request(app.getHttpServer())
+      .post('/payments')
+      .set(signedTestModeHeaders(account, body, 'dashboard-refund-race-1'))
+      .send(body);
+    const paymentId = createRes.body.id;
+    expect(createRes.body.status).toBe('succeeded');
+
+    const agent = await loginDashboard(app, account.email, account.password);
+    const [res1, res2] = await Promise.all([
+      agent.post(`/dashboard/payments/${paymentId}/refund`).set(csrfHeader()).send(),
+      agent.post(`/dashboard/payments/${paymentId}/refund`).set(csrfHeader()).send(),
+    ]);
+
+    const statuses = [res1.status, res2.status].sort();
+    expect(statuses).toEqual([200, 409]); // l'un rembourse, l'autre est rejeté par la réclamation
+
+    const finalPayment = await agent.get('/dashboard/payments').send();
+    const finalStatus = finalPayment.body.items.find((p: { id: string }) => p.id === paymentId)?.status;
+    expect(finalStatus).toBe('refunded');
   });
 
   it('un marchand ne peut pas rembourser le paiement d’un autre marchand', async () => {

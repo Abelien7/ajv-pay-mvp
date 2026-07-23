@@ -32,7 +32,18 @@ export interface StatusResult {
 
 export interface WebhookParseResult {
   providerReference: string;
-  status: 'succeeded' | 'failed' | 'expired';
+  /**
+   * `'processing'` signale un statut intermédiaire (ex: PENDING côté
+   * provider) ou un statut inconnu/non reconnu — dans les deux cas, ce
+   * webhook ne doit déclencher AUCUNE transition finale (voir
+   * `PaymentOrchestrator.handleProviderWebhook`). Avant l'ajout de cette
+   * valeur, un adapter forçait ces cas vers `'failed'`, qui est un état
+   * final : si le provider confirmait ensuite un vrai succès, la
+   * transition `failed → succeeded` était refusée (seule `succeeded →
+   * refunded` est autorisée finale→finale) et le paiement restait
+   * `failed` pour toujours alors que l'argent avait réellement été prélevé.
+   */
+  status: 'succeeded' | 'failed' | 'expired' | 'processing';
   raw: unknown;
 }
 

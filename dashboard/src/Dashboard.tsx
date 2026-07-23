@@ -16,6 +16,7 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [payments, setPayments] = useState<PaymentDto[]>([]);
   const [webhookUrlInput, setWebhookUrlInput] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [refundingId, setRefundingId] = useState<string | null>(null);
 
@@ -53,9 +54,11 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
     if (!window.confirm('Confirmer le remboursement de ce paiement ?')) return;
     setRefundingId(paymentId);
     setError(null);
+    setSuccess(null);
     try {
       await dashboardApi.refundPayment(paymentId);
       await load();
+      setSuccess('Paiement remboursé avec succès.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors du remboursement');
     } finally {
@@ -66,9 +69,12 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
   async function handleSaveWebhookUrl(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setError(null);
+    setSuccess(null);
     try {
       await dashboardApi.updateWebhookUrl(webhookUrlInput);
       await load();
+      setSuccess('URL de webhook enregistrée.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
@@ -88,6 +94,7 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
       </div>
 
       {error && <p className="error-banner">Erreur : {error}</p>}
+      {success && <p className="success-banner">{success}</p>}
 
       <div className="stat-row">
         <div className="card stat-card">
@@ -102,14 +109,15 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
 
       <div className="card" style={{ marginBottom: 24 }}>
         <h2 className="section-title">Webhook</h2>
-        <form onSubmit={handleSaveWebhookUrl} style={{ display: 'flex', gap: 8 }}>
-          <input
-            value={webhookUrlInput}
-            onChange={(e) => setWebhookUrlInput(e.target.value)}
-            placeholder="https://votre-site.com/webhooks/ajvpay"
-            className="field"
-            style={{ flex: 1 }}
-          />
+        <form onSubmit={handleSaveWebhookUrl} style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+          <label className="field" style={{ flex: 1 }}>
+            URL de webhook
+            <input
+              value={webhookUrlInput}
+              onChange={(e) => setWebhookUrlInput(e.target.value)}
+              placeholder="https://votre-site.com/webhooks/ajvpay"
+            />
+          </label>
           <button type="submit" disabled={saving} className="btn btn-primary">
             {saving ? 'Enregistrement…' : 'Enregistrer'}
           </button>

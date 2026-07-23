@@ -48,6 +48,21 @@ export class LedgerService {
   private computeFee(amount: number): number {
     const bps = Number(this.config.get<string>('PLATFORM_FEE_BPS', '0'));
     if (!bps || bps <= 0) return 0;
+    // >= 10000 bps = 100%+ : `net = amount - fee` deviendrait <= 0, ce qui
+    // ferait échouer l'INSERT de la ligne `merchant_payable` (contrainte
+    // `CHECK(amount > 0)` sur ledger_entries) et donc ROLLBACK toute la
+    // transaction commitFinalState — pour CHAQUE paiement réussi, avec
+    // l'argent déjà prélevé côté provider mais le paiement bloqué en
+    // `processing` côté AJV Pay, sans notification ni trace claire. Une
+    // simple faute de frappe de config (ex: "10000" au lieu de "100") ne
+    // doit jamais pouvoir produire ça — on désactive plutôt le frais et on
+    // logue fort, cohérent avec le défaut "désactivé" documenté ci-dessus.
+    if (bps >= 10_000) {
+      this.logger.error(
+        `PLATFORM_FEE_BPS=${bps} est invalide (>= 10000 = 100%+) — frais ignoré pour ce paiement. Corrigez la variable d'environnement.`,
+      );
+      return 0;
+    }
     return Math.floor((amount * bps) / 10_000);
   }
 

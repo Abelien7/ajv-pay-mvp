@@ -15,6 +15,7 @@ export function AdminDashboard({
   const [tab, setTab] = useState<'payments' | 'content'>('payments');
   const [pending, setPending] = useState<PendingManualPayment[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   async function load() {
@@ -40,10 +41,12 @@ export function AdminDashboard({
 
     setBusyId(paymentId);
     setError(null);
+    setSuccess(null);
     try {
       if (decision === 'confirm') await adminApi.confirm(credentials, paymentId);
       else await adminApi.reject(credentials, paymentId);
       await load();
+      setSuccess(decision === 'confirm' ? 'Paiement confirmé.' : 'Paiement rejeté.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la décision');
     } finally {
@@ -82,6 +85,7 @@ export function AdminDashboard({
       ) : (
         <>
           {error && <p className="error-banner">Erreur : {error}</p>}
+          {success && <p className="success-banner">{success}</p>}
 
           <h2 className="section-title">Paiements manuels en attente ({pending.length})</h2>
 

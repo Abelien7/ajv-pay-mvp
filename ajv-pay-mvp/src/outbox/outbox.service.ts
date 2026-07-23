@@ -90,20 +90,31 @@ export class OutboxService {
     return event;
   }
 
-  /** Lus par le processor, dans l'ordre chronologique, par lots bornés. */
-  async listUnprocessed(limit = 50): Promise<OutboxEventRow[]> {
-    const { rows } = await this.db.query<OutboxEventRow>(
+  /**
+   * Réclame UN événement non traité, verrouillé pour la durée de la
+   * transaction appelante (voir OutboxProcessorService) — `SKIP LOCKED`
+   * garantit qu'un appel concurrent (process API et process Worker peuvent
+   * tous deux appeler `processOutbox()` dans la même fenêtre de quelques
+   * centaines de ms) passe simplement à la ligne suivante au lieu de lire
+   * le même événement non traité et de déclencher une notification
+   * marchand en double. Sans ce verrou, `listUnprocessed()` (l'ancienne
+   * version, simple SELECT sans lock) laissait passer exactement cette
+   * course. Doit être appelé À L'INTÉRIEUR d'une transaction (le lock
+   * n'existe que le temps de celle-ci) — voir `markProcessedInTransaction`.
+   */
+  async claimNext(client: PoolClient): Promise<OutboxEventRow | null> {
+    const { rows } = await client.query<OutboxEventRow>(
       `SELECT * FROM outbox_events
        WHERE processed = FALSE
        ORDER BY created_at ASC
-       LIMIT $1`,
-      [limit],
+       LIMIT 1
+       FOR UPDATE SKIP LOCKED`,
     );
-    return rows;
+    return rows[0] ?? null;
   }
 
-  async markProcessed(eventId: string): Promise<void> {
-    await this.db.query(
+  async markProcessedInTransaction(client: PoolClient, eventId: string): Promise<void> {
+    await client.query(
       `UPDATE outbox_events SET processed = TRUE, processed_at = NOW() WHERE id = $1`,
       [eventId],
     );

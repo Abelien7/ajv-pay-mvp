@@ -22,10 +22,13 @@ export function Landing({
   const [cardFeatures, setCardFeatures] = useState<CardFeature[]>([]);
 
   useEffect(() => {
-    siteContentApi.listCountries().then(setCountries);
-    siteContentApi.listNetworks().then(setNetworks);
-    siteContentApi.listNews().then(setNews);
-    siteContentApi.listCardFeatures().then(setCardFeatures);
+    // siteContentApi gère déjà les réponses HTTP en erreur (retourne []) —
+    // ce .catch() couvre seulement l'échec réseau bas niveau (hors-ligne,
+    // DNS, CORS), pour ne pas laisser une promesse rejetée sans handler.
+    siteContentApi.listCountries().then(setCountries).catch(() => {});
+    siteContentApi.listNetworks().then(setNetworks).catch(() => {});
+    siteContentApi.listNews().then(setNews).catch(() => {});
+    siteContentApi.listCardFeatures().then(setCardFeatures).catch(() => {});
   }, []);
 
   const networkNames = networks.map((n) => n.name);
@@ -77,7 +80,7 @@ export function Landing({
 
       <section className="proof-strip">
         <div className="proof-item">
-          <div className="proof-value">{networks.length || 2}</div>
+          <div className="proof-value">{networks.length}</div>
           <div className="proof-label">Réseaux mobile money couverts</div>
         </div>
         <div className="proof-item">
@@ -150,38 +153,26 @@ export function Landing({
       </section>
 
       <section id="ajv-card" className="site-section site-section-alt">
-        <span className="eyebrow" style={{ display: 'block', textAlign: 'center' }}>
-          Vision 2027–2031
-        </span>
+        <span className="eyebrow section-eyebrow-center">Vision 2027–2031</span>
         <h2 className="section-heading">Demain, une carte AJV Pay</h2>
-        <p
-          style={{
-            maxWidth: 680,
-            margin: '0 auto 40px',
-            textAlign: 'center',
-            opacity: 0.85,
-          }}
-        >
+        <p className="section-intro">
           Au-delà du mobile money, AJV Pay travaille à un réseau de cartes de paiement pensé pour
           l'Afrique de l'Ouest — pour que vos clients puissent payer par carte, au même endroit
           qu'ils gèrent déjà leur mobile money.
         </p>
-        <div className="trust-grid">
-          {cardFeatures.map((feature) => (
-            <div key={feature.id} className="trust-card">
-              <h3>{feature.title}</h3>
-              <p>{feature.body}</p>
-            </div>
-          ))}
-        </div>
-        <p
-          style={{
-            textAlign: 'center',
-            marginTop: 32,
-            opacity: 0.7,
-            fontSize: 14,
-          }}
-        >
+        {cardFeatures.length === 0 ? (
+          <p className="empty-state">Détails à venir.</p>
+        ) : (
+          <div className="trust-grid">
+            {cardFeatures.map((feature) => (
+              <div key={feature.id} className="trust-card">
+                <h3>{feature.title}</h3>
+                <p>{feature.body}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="section-note">
           Ce projet est en phase de construction et de dialogue réglementaire — aucune carte n'est
           disponible à ce jour.
         </p>
@@ -196,8 +187,11 @@ export function Landing({
                 {post.image_url && (
                   <img
                     src={post.image_url}
-                    alt=""
+                    alt={post.title}
                     style={{ width: '100%', borderRadius: 8, marginBottom: 12 }}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
                   />
                 )}
                 <h3>{post.title}</h3>

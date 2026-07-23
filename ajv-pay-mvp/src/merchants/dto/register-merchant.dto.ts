@@ -16,6 +16,9 @@ export class RegisterMerchantDto {
   password!: string;
 
   @IsOptional()
-  @IsUrl({ require_tld: false }, { message: 'webhookUrl doit être une URL valide.' })
+  @IsUrl(
+    { require_tld: false, protocols: ['https'], require_protocol: true },
+    { message: 'webhookUrl doit être une URL https valide (ex: https://exemple.com/webhooks/ajvpay).' },
+  )
   webhookUrl?: string;
 }

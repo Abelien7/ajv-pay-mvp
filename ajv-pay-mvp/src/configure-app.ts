@@ -18,6 +18,16 @@ const DOCS_PATH = 'docs';
  * élimine ce risque de divergence prod/test pour de bon.
  */
 export function configureApp(app: INestApplication): void {
+  // En prod, le trafic passe par le reverse-proxy de Railway (un seul saut)
+  // — sans ce réglage, Express `req.ip` renvoie l'adresse du proxy interne,
+  // pas celle du vrai client. Deux conséquences concrètes constatées :
+  // les `audit_logs` (voir migrations/004_audit_logs.sql, pensée comme "la
+  // trace qu'un auditeur ou régulateur demandera") enregistraient une IP
+  // inexacte, et ThrottlerGuard (rate limiting global + anti-bruteforce sur
+  // /dashboard/login) traitait tout le trafic comme venant d'une seule IP —
+  // un pic légitime pouvait alors bloquer tout le monde d'un coup.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
   // La CSP par défaut de helmet (script-src 'self', pas d'inline) bloque le
   // script de bootstrap inliné par Swagger UI — /docs est une page de
   // documentation en lecture seule, sans donnée sensible ni formulaire, donc

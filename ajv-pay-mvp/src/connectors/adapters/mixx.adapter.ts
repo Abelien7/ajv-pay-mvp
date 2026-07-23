@@ -122,7 +122,9 @@ export class MixxAdapter implements PaymentProviderAdapter {
     const providerReference: string = payload?.transaction_id ?? payload?.reference;
 
     const mapped = this.mapStatus(providerStatus);
-    const status: WebhookParseResult['status'] = mapped === 'processing' || mapped === undefined ? 'failed' : mapped;
+    // Statut intermédiaire (PENDING/PROCESSING) ou non reconnu : jamais une
+    // transition finale (voir le commentaire sur WebhookParseResult.status).
+    const status: WebhookParseResult['status'] = mapped ?? 'processing';
     return { providerReference, status, raw: payload };
   }
 

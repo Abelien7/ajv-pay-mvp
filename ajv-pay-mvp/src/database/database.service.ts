@@ -1,6 +1,21 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow, types } from 'pg';
+
+/**
+ * Par défaut, `pg` renvoie les colonnes BIGINT (OID 20) sous forme de
+ * string, pas de number, pour éviter une perte de précision silencieuse
+ * sur de très grandes valeurs. Les deux seules colonnes BIGINT du schéma
+ * sont `payments.amount` et `ledger_entries.amount` (montants en plus
+ * petite unité de devise) — toujours très loin de Number.MAX_SAFE_INTEGER
+ * (2^53), donc le risque de précision ne s'applique pas ici. Sans ce
+ * parseur, `payment.amount` arrivait en string jusque dans les réponses API
+ * et les webhooks marchand (`"amount":"10000"` au lieu de `10000`), en
+ * contradiction avec le DTO d'entrée qui exige `amount: number` — corrigé
+ * une fois pour toutes ici plutôt qu'avec des `Number(...)` éparpillés à
+ * chaque point de sortie.
+ */
+types.setTypeParser(20, (value: string) => Number(value));
 
 /**
  * Couche d'accès PostgreSQL volontairement "fine" (pas d'ORM).

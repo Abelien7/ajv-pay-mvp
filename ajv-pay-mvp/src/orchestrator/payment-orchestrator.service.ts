@@ -1,4 +1,11 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { PaymentsService } from '../payments/payments.service';
 import { ConnectorService } from '../connectors/connector.service';
@@ -124,6 +131,14 @@ export class PaymentOrchestrator {
       return;
     }
 
+    if (parsed.status === 'processing') {
+      // Statut intermédiaire ou non reconnu annoncé par le webhook :
+      // aucune transition à appliquer maintenant, on attend un webhook
+      // ultérieur avec un statut final (voir WebhookParseResult.status).
+      this.logger.log(`Webhook ${provider} reçu avec statut intermédiaire/inconnu, payment=${payment.id}`);
+      return;
+    }
+
     let resolvedStatus: 'succeeded' | 'failed' | 'expired' = parsed.status;
     let rawPayload: unknown = parsed.raw;
     if (this.connector.requiresStatusConfirmation(provider)) {
@@ -142,8 +157,16 @@ export class PaymentOrchestrator {
   }
 
   /**
-   * Déclenche un remboursement : appel provider, puis transition atomique
-   * statut + ledger d'inversion + événement.
+   * Déclenche un remboursement : réclamation atomique, appel provider, puis
+   * transition atomique statut + ledger d'inversion + événement.
+   *
+   * La réclamation (`claimRefund`) doit avoir lieu AVANT l'appel provider,
+   * jamais après : deux requêtes concurrentes (double-clic marchand, retry
+   * réseau) passeraient toutes les deux une simple vérification de statut
+   * non verrouillée, et appelleraient chacune le provider — un double
+   * remboursement RÉEL, que `commitFinalState` (verrouillé, mais appelé
+   * après coup) ne peut plus empêcher à ce stade. Voir
+   * migrations/014_refund_claim.sql.
    */
   async refundPayment(paymentId: string): Promise<Payment> {
     const payment = await this.payments.getPaymentById(paymentId);
@@ -156,8 +179,22 @@ export class PaymentOrchestrator {
       );
     }
 
-    const result = await this.connector.refund(payment);
+    const claimed = await this.payments.claimRefund(paymentId);
+    if (!claimed) {
+      throw new ConflictException(
+        `Un remboursement est déjà en cours (ou déjà effectué) pour le paiement ${paymentId}.`,
+      );
+    }
+
+    let result;
+    try {
+      result = await this.connector.refund(claimed);
+    } catch (error) {
+      await this.payments.releaseRefundClaim(paymentId);
+      throw error;
+    }
     if (!result.success) {
+      await this.payments.releaseRefundClaim(paymentId);
       throw new UnprocessableEntityException(
         `Le provider a refusé le remboursement pour le paiement ${paymentId}.`,
       );
