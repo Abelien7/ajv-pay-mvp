@@ -81,7 +81,7 @@ export class PaymentsService {
           merchantId,
           dto.amount,
           dto.currency ?? 'XOF',
-          dto.method,
+          dto.method ?? 'fedapay',
           mode,
           dto.phoneNumber,
           idempotencyKey,
@@ -219,6 +219,22 @@ export class PaymentsService {
    *     ne changeait jamais réellement le statut du paiement (silencieux,
    *     200 OK renvoyé quand même), sans jamais avoir été détecté faute de
    *     test qui exerçait vraiment ce chemin de bout en bout.
+   *
+   *     **Deuxième bug corrigé (découvert en testant l'intégration FedaPay
+   *     bout en bout le 2026-07-23, mais affectait CinetPay en prod depuis
+   *     le début)** : juste après `setProcessing()` (statut mis à
+   *     'processing' avant même d'appeler le provider), `PaymentOrchestrator
+   *     .initiate()` rappelle `applyFinalTransition` avec le statut renvoyé
+   *     par `connector.initiate()` — qui vaut aussi 'processing' pour tout
+   *     provider à redirection (CinetPay, FedaPay), le temps que le client
+   *     paie réellement. La garde ci-dessus traitait ce `processing →
+   *     processing` comme un doublon et l'ignorait TOTALEMENT, y compris
+   *     `provider_reference`/`redirect_url` — `redirect_url` n'était donc
+   *     JAMAIS écrit en base pour ces providers, silencieusement (aucun
+   *     paiement CinetPay n'a jamais renvoyé de vrai lien de paiement via
+   *     l'API). Un `processing → processing` non final avec de nouvelles
+   *     valeurs à attacher doit donc persister ces champs (sans réémettre
+   *     d'événement `payment_events`, déjà fait par `setProcessing()`).
    */
   private async transitionCore(
     client: PoolClient,
@@ -238,8 +254,20 @@ export class PaymentsService {
     const payment = rows[0];
 
     if (payment.status === newStatus) {
-      this.logger.warn(`Transition ignorée (déjà en statut ${newStatus}) pour ${paymentId}`);
-      return payment;
+      if (!providerReference && !redirectUrl) {
+        this.logger.warn(`Transition ignorée (déjà en statut ${newStatus}) pour ${paymentId}`);
+        return payment;
+      }
+      // Rien ne change côté statut, mais provider_reference/redirect_url doivent être
+      // attachés (voir commentaire ci-dessus) — pas de nouvel événement, déjà émis.
+      const attached = await client.query<Payment>(
+        `UPDATE payments SET
+           provider_reference = COALESCE($2, provider_reference),
+           redirect_url = COALESCE($3, redirect_url)
+         WHERE id = $1 RETURNING *`,
+        [paymentId, providerReference ?? null, redirectUrl ?? null],
+      );
+      return attached.rows[0];
     }
     const isRefundOfSucceeded = payment.status === 'succeeded' && newStatus === 'refunded';
     if (['succeeded', 'failed', 'expired', 'refunded'].includes(payment.status) && !isRefundOfSucceeded) {

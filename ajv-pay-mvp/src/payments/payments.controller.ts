@@ -50,7 +50,10 @@ export class PaymentsController {
    * L'écriture (création de paiement) passe TOUJOURS par l'orchestrateur —
    * jamais directement par PaymentsService depuis un controller.
    */
-  @ApiOperation({ summary: 'Crée un paiement (idempotent via l’en-tête Idempotency-Key, obligatoire)' })
+  @ApiOperation({
+    summary: 'Crée un paiement (idempotent via l’en-tête Idempotency-Key, obligatoire)',
+    description: "`method` est optionnel — 'fedapay' par défaut (résolution automatique, aucune intervention admin).",
+  })
   @Post()
   async create(
     @CurrentMerchant() merchant: Merchant,

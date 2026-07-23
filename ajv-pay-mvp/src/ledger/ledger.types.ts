@@ -5,9 +5,15 @@ export type LedgerAccount =
   | 'provider_mixx'
   | 'provider_manual'
   | 'provider_cinetpay'
+  | 'provider_fedapay'
   | 'fees';
 
-export type ProviderLedgerAccount = 'provider_moov' | 'provider_mixx' | 'provider_manual' | 'provider_cinetpay';
+export type ProviderLedgerAccount =
+  | 'provider_moov'
+  | 'provider_mixx'
+  | 'provider_manual'
+  | 'provider_cinetpay'
+  | 'provider_fedapay';
 
 export type LedgerDirection = 'debit' | 'credit';
 

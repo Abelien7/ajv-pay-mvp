@@ -13,7 +13,7 @@ export interface Payment {
   merchant_id: string;
   amount: number;
   currency: string;
-  method: 'moov' | 'mixx' | 'manual' | 'cinetpay';
+  method: 'moov' | 'mixx' | 'manual' | 'cinetpay' | 'fedapay';
   /** 'test' => jamais de ledger, résolution instantanée (voir TestModeAdapter). */
   mode: PaymentMode;
   phone_number: string | null;

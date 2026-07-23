@@ -4,6 +4,7 @@ import { MoovAdapter } from './adapters/moov.adapter';
 import { MixxAdapter } from './adapters/mixx.adapter';
 import { ManualAdapter } from './adapters/manual.adapter';
 import { CinetpayAdapter } from './adapters/cinetpay.adapter';
+import { FedaPayAdapter } from './adapters/fedapay.adapter';
 import { TestModeAdapter } from './adapters/test-mode.adapter';
 import { PAYMENT_ADAPTER_REGISTRY } from './connector.token';
 import { PaymentProviderAdapter, ProviderName } from './connector.interface';
@@ -32,6 +33,7 @@ import { ConnectorService } from './connector.service';
     MixxAdapter,
     ManualAdapter,
     CinetpayAdapter,
+    FedaPayAdapter,
     TestModeAdapter,
     ConnectorService,
     {
@@ -41,16 +43,18 @@ import { ConnectorService } from './connector.service';
         mixx: MixxAdapter,
         manual: ManualAdapter,
         cinetpay: CinetpayAdapter,
+        fedapay: FedaPayAdapter,
       ): Map<ProviderName, PaymentProviderAdapter> => {
         const entries: Array<[ProviderName, PaymentProviderAdapter]> = [
           ['moov', moov],
           ['mixx', mixx],
           ['manual', manual],
           ['cinetpay', cinetpay],
+          ['fedapay', fedapay],
         ];
         return new Map<ProviderName, PaymentProviderAdapter>(entries);
       },
-      inject: [MoovAdapter, MixxAdapter, ManualAdapter, CinetpayAdapter],
+      inject: [MoovAdapter, MixxAdapter, ManualAdapter, CinetpayAdapter, FedaPayAdapter],
     },
   ],
   exports: [PAYMENT_ADAPTER_REGISTRY, ConnectorService],

@@ -74,6 +74,17 @@ export class ProviderWebhooksController {
     return { received: true };
   }
 
+  @Post('fedapay')
+  @HttpCode(200)
+  async handleFedaPayWebhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Body() body: unknown,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    await this.handle('fedapay', req, body, headers);
+    return { received: true };
+  }
+
   private async handle(
     provider: ProviderName,
     req: RawBodyRequest<Request>,

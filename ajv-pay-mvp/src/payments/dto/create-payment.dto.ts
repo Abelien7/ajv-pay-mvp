@@ -16,8 +16,16 @@ export class CreatePaymentDto {
   @IsString()
   currency?: string = 'XOF';
 
-  @IsIn(['moov', 'mixx', 'manual', 'cinetpay'])
-  method!: 'moov' | 'mixx' | 'manual' | 'cinetpay';
+  /**
+   * `fedapay` par défaut si omis : c'est la méthode automatique recommandée
+   * pour toute nouvelle plateforme qui se connecte à AJV Pay (résolution
+   * par webhook, aucune intervention admin nécessaire) — 'manual' reste
+   * disponible mais n'est plus le choix implicite (décision utilisateur
+   * du 2026-07-23).
+   */
+  @IsOptional()
+  @IsIn(['moov', 'mixx', 'manual', 'cinetpay', 'fedapay'])
+  method?: 'moov' | 'mixx' | 'manual' | 'cinetpay' | 'fedapay' = 'fedapay';
 
   @IsString()
   @Matches(/^\+?[0-9]{8,15}$/, {

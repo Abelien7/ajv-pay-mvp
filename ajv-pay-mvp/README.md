@@ -18,19 +18,26 @@ intégration ad hoc par projet.
     déclenche déjà une livraison immédiate best-effort juste après
     confirmation d'un paiement — le Worker n'est qu'un filet de sécurité,
     pas le chemin principal.
-- Quatre providers de paiement, routés par `payment.method` (voir
+- Cinq providers de paiement, routés par `payment.method` (voir
   `src/connectors/connectors.module.ts`) :
-  - `moov` — Moov Money (Moov Africa, ex-Flooz). Stub générique en attente
-    de credentials marchand réels.
-  - `mixx` — Mixx by Yas (Togocom, ex-T-Money). Stub générique, même
-    remarque.
+  - `fedapay` — **méthode par défaut si `method` est omis** (décision du
+    2026-07-23 : toute nouvelle plateforme qui se connecte à AJV Pay doit
+    tourner en automatique sans intervention admin). Agrégateur FedaPay,
+    automatise Moov Togo + Togocel via une page de paiement hébergée
+    (`redirect_url`), résolution par webhook — voir `FedaPayAdapter`.
+  - `moov` — Moov Money (Moov Africa, ex-Flooz), API directe. Stub
+    générique en attente de credentials marchand réels — **priorité réelle
+    à terme** (remplacera `fedapay` pour ce réseau une fois obtenus).
+  - `mixx` — Mixx by Yas (Togocom, ex-T-Money), API directe. Stub
+    générique, même remarque que `moov`.
   - `manual` — paiement vérifié à la main : le client envoie l'argent
     lui-même vers un numéro marchand fixe (un par réseau, syntaxe USSD
     différente pour chacun — voir `ManualPaymentsService`) et soumet son ID
     de transaction ; un admin plateforme unique (pas un compte par
     marchand) le confirme ou le rejette depuis une file d'attente
-    centralisée regroupant tous les marchands connectés. Ne dépend
-    d'aucune API tierce, fonctionne dès aujourd'hui.
+    centralisée regroupant tous les marchands connectés. Reste disponible
+    (ex: Mavahi, déjà connecté ainsi) mais n'est plus le choix par défaut —
+    nécessite une intervention admin, contrairement à `fedapay`.
   - `cinetpay` — carte bancaire (Visa/Mastercard) via l'agrégateur CinetPay,
     en redirection (`redirect_url`) : le client saisit sa carte sur une page
     hébergée par CinetPay, jamais sur nos serveurs. Contrat d'API confirmé
@@ -55,8 +62,9 @@ intégration ad hoc par projet.
 ```bash
 npm install
 cp .env.example .env
-# éditer .env : DATABASE_URL, MOOV_*/MIXX_* (credentials en attente),
-# MANUAL_PAYMENT_NUMBER_MOOV/MIXX, ADMIN_API_KEY
+# éditer .env : DATABASE_URL, FEDAPAY_SECRET_KEY/FEDAPAY_ENVIRONMENT
+# (méthode par défaut, sandbox d'abord), MOOV_*/MIXX_* (credentials en
+# attente), MANUAL_PAYMENT_NUMBER_MOOV/MIXX, ADMIN_API_KEY
 
 npm run migrate     # applique migrations/*.sql dans l'ordre
 
@@ -108,6 +116,15 @@ en test sans conflit — ce sont deux univers de données séparés.
 ## Endpoints principaux
 
 ### `POST /payments`
+```json
+{
+  "amount": 5000,
+  "currency": "XOF",
+  "phoneNumber": "+22890123456"
+}
+```
+`method` est optionnel — `"fedapay"` par défaut (automatique, sans
+intervention admin). Pour forcer `"manual"` à la place :
 ```json
 {
   "amount": 5000,

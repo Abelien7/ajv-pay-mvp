@@ -30,6 +30,7 @@
     "class-validator": "^0.14.1",
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.5",
+    "fedapay": "^1.2.5",
     "helmet": "^7.1.0",
     "pg": "^8.12.0",
     "reflect-metadata": "^0.2.2",
