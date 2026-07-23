@@ -102,8 +102,15 @@ export class PaymentOrchestrator {
         provider_reference: result.providerReference,
       }, result.providerReference, result.redirectUrl);
     } catch (error: any) {
-      this.logger.error(`Échec orchestration pour payment=${payment.id}: ${error.message}`);
-      return await this.commitFinalState(payment.id, 'failed', { reason: error.message });
+      // Les SDK provider (ex: FedaPay) enrichissent souvent l'erreur avec le
+      // corps de la réponse HTTP réelle (`errorMessage`/`errors`) en plus du
+      // message générique d'axios ("Request failed with status code 400") —
+      // sans ça, ni les logs ni le paiement en base ne disent JAMAIS pourquoi
+      // le provider a refusé la requête.
+      const providerDetail = error.errorMessage ?? (error.errors ? JSON.stringify(error.errors) : null);
+      const message = providerDetail ? `${error.message} — ${providerDetail}` : error.message;
+      this.logger.error(`Échec orchestration pour payment=${payment.id}: ${message}`);
+      return await this.commitFinalState(payment.id, 'failed', { reason: message });
     }
   }
 
