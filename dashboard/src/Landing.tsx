@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { siteContentApi } from './siteContentApi';
 import type { CardFeature, ListItem, NewsPost } from './types';
 
-const API_DOCS_URL = 'https://ajv-pay-mvp-production.up.railway.app/docs';
+const API_DOCS_URL = 'https://ajv-pay-mvp.onrender.com/docs';
 
 const METHOD_DESCRIPTIONS: Record<string, string> = {
   'Moov Money': 'Paiement mobile via Moov Africa.',
