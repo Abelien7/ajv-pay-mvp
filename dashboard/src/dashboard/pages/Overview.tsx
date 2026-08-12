@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { dashboardApi } from '../../dashboardApi';
 import type { PaymentDto } from '../../types';
@@ -6,21 +6,35 @@ import { useMerchant } from '../MerchantContext';
 import { PaymentsTable } from '../PaymentsTable';
 
 const RECENT_COUNT = 5;
+const POLL_INTERVAL_MS = 15_000;
 
 export function Overview() {
   const { me } = useMerchant();
   const [recent, setRecent] = useState<PaymentDto[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const requestSeq = useRef(0);
 
   useEffect(() => {
-    dashboardApi
-      .listPayments(RECENT_COUNT, 0)
-      .then((res) => {
-        setRecent(res.items);
-        setTotal(res.total);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Erreur inconnue'));
+    function load() {
+      const seq = ++requestSeq.current;
+      dashboardApi
+        .listPayments(RECENT_COUNT, 0)
+        .then((res) => {
+          if (seq !== requestSeq.current) return;
+          setRecent(res.items);
+          setTotal(res.total);
+          setError(null);
+        })
+        .catch((err) => {
+          if (seq !== requestSeq.current) return;
+          setError(err instanceof Error ? err.message : 'Erreur inconnue');
+        });
+    }
+
+    load();
+    const interval = setInterval(load, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
   }, []);
 
   return (

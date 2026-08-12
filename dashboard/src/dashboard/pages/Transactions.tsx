@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { dashboardApi } from '../../dashboardApi';
 import type { PaymentDto } from '../../types';
 import { PaymentsTable } from '../PaymentsTable';
 
 const PAGE_SIZE = 20;
+const POLL_INTERVAL_MS = 15_000;
 
 export function Transactions() {
   const [payments, setPayments] = useState<PaymentDto[]>([]);
@@ -14,22 +15,37 @@ export function Transactions() {
   const [refundingId, setRefundingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  async function load() {
-    setLoading(true);
+  // Compteur de requêtes : une réponse dont le numéro ne correspond plus au
+  // dernier appel lancé est ignorée. Sans ça, deux clics rapides sur
+  // "Suivant"/"Précédent" (ou un rafraîchissement automatique qui répond
+  // après un changement de page manuel) peuvent faire gagner la réponse la
+  // plus lente et afficher des données d'une autre page que celle demandée.
+  const requestSeq = useRef(0);
+
+  async function load(showLoading: boolean) {
+    const seq = ++requestSeq.current;
+    if (showLoading) setLoading(true);
     try {
       const res = await dashboardApi.listPayments(PAGE_SIZE, offset);
+      if (seq !== requestSeq.current) return; // réponse obsolète, une requête plus récente est en cours
       setPayments(res.items);
       setTotal(res.total);
       setError(null);
     } catch (err) {
+      if (seq !== requestSeq.current) return;
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current && showLoading) setLoading(false);
     }
   }
 
   useEffect(() => {
-    load();
+    load(true);
+    // Rafraîchissement périodique silencieux (pas de "Chargement…" qui
+    // clignote toutes les 15s) — un marchand qui surveille l'arrivée d'un
+    // paiement doit le voir apparaître sans recharger la page.
+    const interval = setInterval(() => load(false), POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offset]);
 
@@ -40,7 +56,7 @@ export function Transactions() {
     setSuccess(null);
     try {
       await dashboardApi.refundPayment(paymentId);
-      await load();
+      await load(false);
       setSuccess('Paiement remboursé avec succès.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors du remboursement');

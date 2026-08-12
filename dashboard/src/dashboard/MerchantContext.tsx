@@ -5,6 +5,13 @@ import type { MerchantMeResponse } from '../types';
 interface MerchantContextValue {
   me: MerchantMeResponse | null;
   loading: boolean;
+  error: string | null;
+  /**
+   * N'échoue jamais (voir implémentation) — un appelant qui vient de
+   * réussir une autre action (ex: enregistrer l'URL de webhook) ne doit
+   * jamais voir CETTE simple actualisation en arrière-plan transformer son
+   * succès en message d'erreur.
+   */
   reload: () => Promise<void>;
 }
 
@@ -19,11 +26,22 @@ const MerchantContext = createContext<MerchantContextValue | null>(null);
 export function MerchantProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<MerchantMeResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    const response = await dashboardApi.getMe();
-    setMe(response);
-    setLoading(false);
+    try {
+      const response = await dashboardApi.getMe();
+      setMe(response);
+      setError(null);
+    } catch (err) {
+      // Ne PAS laisser `loading` bloqué à true indéfiniment (sidebar/topbar
+      // coincés sur "…" pour toujours) ni faire planter un appelant qui
+      // enchaîne reload() après une action déjà réussie — l'erreur est
+      // exposée via le contexte, à charge du consommateur de l'afficher.
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -32,7 +50,7 @@ export function MerchantProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [reload]);
 
-  return <MerchantContext.Provider value={{ me, loading, reload }}>{children}</MerchantContext.Provider>;
+  return <MerchantContext.Provider value={{ me, loading, error, reload }}>{children}</MerchantContext.Provider>;
 }
 
 export function useMerchant(): MerchantContextValue {
