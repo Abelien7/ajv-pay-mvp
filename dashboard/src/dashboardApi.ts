@@ -1,6 +1,21 @@
 import type { MerchantMeResponse, PaymentDto, PaymentListResponse, RegisterMerchantResponse } from './types';
 import { friendlyApiError } from './apiError';
 
+/**
+ * En production, pointe vers `/api-proxy` (voir `vercel.json`) — un
+ * rewrite Vercel qui relaie transparentement vers l'API Render, plutôt que
+ * l'URL Render directe utilisée jusqu'ici. Trouvé le 2026-08-12 : le cookie
+ * de session dashboard est correctement configuré (`Secure; SameSite=None`,
+ * vérifié via `curl -i`), mais un appel direct cross-origin (Vercel →
+ * Render, deux domaines complètement distincts) en fait un cookie TIERS —
+ * de plus en plus bloqué par défaut par Chrome/Safari/Firefox, ce qui
+ * faisait perdre la session à chaque rechargement de page. En passant par
+ * ce proxy same-origin, le navigateur ne voit jamais Render directement :
+ * le cookie devient un cookie de premier niveau pour ajv-pay-mvp.vercel.app,
+ * plus soumis à aucun blocage tiers. N'affecte que ce fichier (le seul à
+ * utiliser `credentials: 'include'` — voir siteContentApi.ts/adminApi.ts,
+ * qui n'ont pas ce problème et peuvent rester en appel direct).
+ */
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
 
 /**
