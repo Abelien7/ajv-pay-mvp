@@ -469,6 +469,190 @@ table.payments-table tr:last-child td {
 }
 
 /* ========================================================
+   Tableau de bord marchand (dashboard/) — structure multi-pages
+   inspirée du tableau de bord FedaPay (barre latérale + en-tête),
+   couleurs propres à AJV Pay (vert/or), pas le violet FedaPay.
+   ======================================================== */
+
+.dash-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.dash-sidebar {
+  width: 240px;
+  flex: none;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 16px;
+}
+
+.dash-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px;
+  margin-bottom: 24px;
+}
+
+.dash-sidebar-merchant {
+  padding: 12px 8px 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.dash-sidebar-merchant-name {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.dash-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-decoration: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  width: 100%;
+}
+
+.dash-nav-link:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.dash-nav-link-active {
+  background: var(--success-bg);
+  color: var(--brand-600);
+}
+
+.dash-nav-logout {
+  margin-top: auto;
+}
+
+.dash-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-topbar {
+  border-bottom: 1px solid var(--border);
+  padding: 16px 32px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.dash-topbar-balance {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.dash-topbar-balance-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--brand-900);
+}
+
+.dash-content {
+  flex: 1;
+  padding: 28px 32px 48px;
+  max-width: 1080px;
+  width: 100%;
+}
+
+.page-title {
+  font-family: var(--font-head);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.dash-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.dash-section-header .section-title {
+  margin: 0;
+}
+
+.dash-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.dash-pagination-status {
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+@media (max-width: 800px) {
+  .dash-shell {
+    flex-direction: column;
+  }
+  .dash-sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    padding: 12px 16px;
+    overflow-x: auto;
+  }
+  .dash-sidebar-brand,
+  .dash-sidebar-merchant {
+    display: none;
+  }
+  .dash-nav {
+    flex-direction: row;
+  }
+  .dash-nav-link {
+    white-space: nowrap;
+  }
+  .dash-nav-logout {
+    margin-top: 0;
+    margin-left: auto;
+  }
+  .dash-content {
+    padding: 20px 16px 40px;
+  }
+  .dash-topbar {
+    padding: 12px 16px;
+  }
+}
+
+/* ========================================================
    Site vitrine (Landing.tsx)
    ======================================================== */
 

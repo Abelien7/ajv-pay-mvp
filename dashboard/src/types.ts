@@ -1,5 +1,5 @@
 export type PaymentStatus = 'pending' | 'processing' | 'succeeded' | 'failed' | 'expired' | 'refunded';
-export type PaymentMethod = 'moov' | 'mixx' | 'manual';
+export type PaymentMethod = 'moov' | 'mixx' | 'manual' | 'cinetpay' | 'fedapay';
 
 export interface PaymentDto {
   id: string;

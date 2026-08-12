@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Dashboard } from './Dashboard';
+import { DashboardApp } from './dashboard/DashboardApp';
 import { Landing } from './Landing';
 import { LoginForm } from './LoginForm';
 import { SignupForm } from './SignupForm';
@@ -51,7 +51,7 @@ export default function App() {
   // ou l'écran de connexion au rechargement de la page.
   if (session) {
     return (
-      <Dashboard
+      <DashboardApp
         onLogout={() => {
           clearSession();
           setMode('login');
