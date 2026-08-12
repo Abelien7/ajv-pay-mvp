@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { DatabaseService } from '../database/database.service';
 import { OutboxProcessorService } from '../outbox/outbox-processor.service';
 import { WebhooksService } from '../webhooks/webhooks.service';
+import { PaymentOrchestrator } from '../orchestrator/payment-orchestrator.service';
 import { AlertingService } from './alerting.service';
 
 /**
@@ -21,6 +22,7 @@ export class WorkerCronService {
     private readonly db: DatabaseService,
     private readonly outboxProcessor: OutboxProcessorService,
     private readonly webhooks: WebhooksService,
+    private readonly orchestrator: PaymentOrchestrator,
     private readonly alerting: AlertingService,
   ) {}
 
@@ -43,6 +45,27 @@ export class WorkerCronService {
       await this.alerting.checkAndAlert();
     } catch (err: any) {
       this.logger.error(`Échec de la vérification d'alerte: ${err.message}`);
+    }
+  }
+
+  /**
+   * Filet de sécurité indépendant du tick principal : rattrape un paiement
+   * dont la confirmation ne serait jamais arrivée par webhook, quelle que
+   * soit la raison (voir PaymentOrchestrator.reconcileStaleProcessingPayments).
+   * Cadence volontairement plus lente que le tick de 10s — interroger
+   * activement l'API d'un provider (FedaPay) coûte un appel réseau par
+   * paiement bloqué, inutile de le faire aussi souvent que le traitement de
+   * l'outbox/webhooks (opérations purement internes, elles).
+   */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async reconcileStaleProcessing(): Promise<void> {
+    try {
+      const count = await this.orchestrator.reconcileStaleProcessingPayments();
+      if (count > 0) {
+        this.logger.warn(`Réconciliation : ${count} paiement(s) rattrapé(s) sans webhook reçu.`);
+      }
+    } catch (err: any) {
+      this.logger.error(`Erreur pendant la réconciliation des paiements bloqués: ${err.message}`);
     }
   }
 

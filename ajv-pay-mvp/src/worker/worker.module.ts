@@ -5,6 +5,7 @@ import { DatabaseModule } from '../database/database.module';
 import { OutboxModule } from '../outbox/outbox.module';
 import { OutboxProcessorModule } from '../outbox/outbox-processor.module';
 import { WebhooksModule } from '../webhooks/webhooks.module';
+import { OrchestratorModule } from '../orchestrator/orchestrator.module';
 import { WorkerCronService } from './worker-cron.service';
 import { AlertingService } from './alerting.service';
 
@@ -25,6 +26,7 @@ import { AlertingService } from './alerting.service';
     OutboxModule,
     OutboxProcessorModule,
     WebhooksModule,
+    OrchestratorModule,
   ],
   providers: [WorkerCronService, AlertingService],
 })

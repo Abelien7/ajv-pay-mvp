@@ -202,6 +202,35 @@ export class PaymentsService {
   }
 
   /**
+   * Filet de sécurité (voir PaymentOrchestrator.reconcileStaleProcessingPayments) :
+   * un paiement resté 'processing' anormalement longtemps a très
+   * probablement manqué son webhook de confirmation (panne réseau, provider
+   * en échec de livraison, cold start d'un service qui dort — vécu en vrai
+   * le 2026-08-11 avec un paiement FedaPay resté bloqué malgré une
+   * transaction approuvée côté FedaPay). `manual` est exclu : sa
+   * confirmation est une décision humaine explicite (voir
+   * ManualReviewController), jamais quelque chose qu'un provider peut
+   * confirmer via `checkStatus`. Les paiements 'test' sont exclus aussi —
+   * `TestModeAdapter` les résout de façon synchrone, ils ne devraient
+   * jamais rester 'processing'. `provider_reference` doit être non-null
+   * (sinon aucun `checkStatus` possible).
+   */
+  async findStaleProcessing(olderThanMinutes: number, limit: number): Promise<Payment[]> {
+    const { rows } = await this.db.query<Payment>(
+      `SELECT * FROM payments
+       WHERE status = 'processing'
+         AND mode = 'live'
+         AND method != 'manual'
+         AND provider_reference IS NOT NULL
+         AND updated_at < NOW() - ($1 || ' minutes')::interval
+       ORDER BY updated_at ASC
+       LIMIT $2`,
+      [olderThanMinutes, limit],
+    );
+    return rows;
+  }
+
+  /**
    * Logique d'écriture brute (lock + garde-fous + UPDATE + payment_events),
    * SANS gestion de transaction — c'est la responsabilité de l'appelant
    * (soit `setProcessing` avec sa propre transaction, soit

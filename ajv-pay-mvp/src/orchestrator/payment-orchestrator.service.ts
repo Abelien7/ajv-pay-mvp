@@ -115,17 +115,31 @@ export class PaymentOrchestrator {
   }
 
   /**
-   * Traite un webhook entrant provider (Moov/Mixx) : résout le
+   * Traite un webhook entrant provider (Moov/Mixx/FedaPay) : résout le
    * paiement via provider_reference, puis applique la même transaction
    * atomique que createPayment pour la transition finale.
    *
    * `provider` est déterminé sans ambiguïté par la route HTTP appelée
-   * (/webhooks/moov, /webhooks/mixx) — voir `ProviderWebhooksController`.
-   * Si l'adapter du provider est marqué `confirmViaStatusCheck` (utile pour
-   * un provider dont le contenu du webhook n'est pas jugé fiable par sa
-   * propre documentation), on ignore le statut annoncé par le webhook et on
-   * rappelle activement `checkStatus()` comme source de vérité avant toute
-   * transition. Ni Moov ni Mixx ne l'activent aujourd'hui.
+   * (/webhooks/moov, /webhooks/mixx, /webhooks/fedapay) — voir
+   * `ProviderWebhooksController`.
+   *
+   * **Bug corrigé (trouvé en réconciliant un vrai paiement FedaPay resté
+   * bloqué en "processing" malgré une transaction approuvée côté FedaPay,
+   * 2026-08-12)** : l'ancienne version testait `parsed.status ===
+   * 'processing'` et sortait AVANT même de regarder
+   * `requiresStatusConfirmation(provider)`. Or un provider marqué
+   * `confirmViaStatusCheck` (FedaPay, CinetPay) renvoie *toujours*
+   * `'processing'` depuis `parseWebhook()` par conception — leur webhook ne
+   * transporte jamais le vrai statut, voir FedaPayAdapter. Résultat : pour
+   * ces providers, `checkStatus()` — censé faire foi — n'était JAMAIS
+   * atteint, quel que soit l'événement webhook reçu. Un paiement FedaPay ne
+   * pouvait donc jamais se confirmer tout seul via webhook, silencieusement,
+   * depuis l'intégration FedaPay elle-même. Corrigé en vérifiant
+   * `requiresStatusConfirmation` EN PREMIER : pour ces providers, le
+   * contenu du webhook (y compris son statut annoncé) est entièrement
+   * ignoré, seul `checkStatus()` fait foi. Pour les autres (Moov/Mixx,
+   * aujourd'hui non `confirmViaStatusCheck`), le comportement d'origine est
+   * inchangé.
    */
   async handleProviderWebhook(provider: ProviderName, payload: unknown): Promise<void> {
     const parsed = this.connector.parseWebhook(provider, payload);
@@ -138,16 +152,9 @@ export class PaymentOrchestrator {
       return;
     }
 
-    if (parsed.status === 'processing') {
-      // Statut intermédiaire ou non reconnu annoncé par le webhook :
-      // aucune transition à appliquer maintenant, on attend un webhook
-      // ultérieur avec un statut final (voir WebhookParseResult.status).
-      this.logger.log(`Webhook ${provider} reçu avec statut intermédiaire/inconnu, payment=${payment.id}`);
-      return;
-    }
+    let resolvedStatus: 'succeeded' | 'failed' | 'expired';
+    let rawPayload: unknown;
 
-    let resolvedStatus: 'succeeded' | 'failed' | 'expired' = parsed.status;
-    let rawPayload: unknown = parsed.raw;
     if (this.connector.requiresStatusConfirmation(provider)) {
       const confirmed = await this.connector.checkStatus(provider, parsed.providerReference);
       if (confirmed.status === 'processing') {
@@ -157,10 +164,62 @@ export class PaymentOrchestrator {
       }
       resolvedStatus = confirmed.status;
       rawPayload = confirmed.raw;
+    } else {
+      if (parsed.status === 'processing') {
+        // Statut intermédiaire ou non reconnu annoncé par le webhook :
+        // aucune transition à appliquer maintenant, on attend un webhook
+        // ultérieur avec un statut final (voir WebhookParseResult.status).
+        this.logger.log(`Webhook ${provider} reçu avec statut intermédiaire/inconnu, payment=${payment.id}`);
+        return;
+      }
+      resolvedStatus = parsed.status;
+      rawPayload = parsed.raw;
     }
 
     const targetStatus: PaymentStatus = resolvedStatus === 'expired' ? 'failed' : resolvedStatus;
     await this.commitFinalState(payment.id, targetStatus, { provider_payload: rawPayload }, parsed.providerReference);
+  }
+
+  /**
+   * Filet de sécurité, appelé périodiquement par WorkerCronService : un
+   * webhook peut toujours se perdre pour une raison qui n'a rien à voir
+   * avec un bug de code (panne réseau, provider en échec de livraison,
+   * service qui dort le temps d'un cold start...) — ce n'est pas quelque
+   * chose qu'on peut éliminer une fois pour toutes en corrigant du code,
+   * seulement rattraper. Réutilise `checkStatus` (déjà appelé pour
+   * confirmer un webhook entrant) comme source de vérité active, puis
+   * `commitFinalState` — donc les MÊMES garanties (transaction atomique
+   * statut+ledger+outbox, notification marchand) qu'un paiement confirmé
+   * normalement par webhook. Un paiement encore 'processing' côté provider
+   * reste tel quel, aucune transition forcée.
+   */
+  async reconcileStaleProcessingPayments(olderThanMinutes = 3, batchSize = 25): Promise<number> {
+    const stale = await this.payments.findStaleProcessing(olderThanMinutes, batchSize);
+    let reconciled = 0;
+
+    for (const payment of stale) {
+      try {
+        const confirmed = await this.connector.checkStatus(payment.method, payment.provider_reference!);
+        if (confirmed.status === 'processing') {
+          continue; // toujours en attente côté provider, rien à faire pour l'instant
+        }
+        const targetStatus: PaymentStatus = confirmed.status === 'expired' ? 'failed' : confirmed.status;
+        await this.commitFinalState(
+          payment.id,
+          targetStatus,
+          { provider_payload: confirmed.raw, reconciliation: 'stale_processing_sweep' },
+          confirmed.providerReference,
+        );
+        reconciled += 1;
+        this.logger.warn(
+          `Paiement ${payment.id} rattrapé par la réconciliation (webhook jamais reçu) : ${payment.status} -> ${targetStatus}`,
+        );
+      } catch (err: any) {
+        this.logger.error(`Échec de réconciliation pour payment=${payment.id}: ${err.message}`);
+      }
+    }
+
+    return reconciled;
   }
 
   /**

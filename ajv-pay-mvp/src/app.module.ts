@@ -10,6 +10,7 @@ import { AuditModule } from './audit/audit.module';
 import { OutboxModule } from './outbox/outbox.module';
 import { OutboxProcessorModule } from './outbox/outbox-processor.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { OrchestratorModule } from './orchestrator/orchestrator.module';
 import { DashboardAuthModule } from './dashboard-auth/dashboard-auth.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { SiteContentModule } from './site-content/site-content.module';
@@ -31,11 +32,15 @@ import { AlertingService } from './worker/alerting.service';
  * paiement (voir PaymentOrchestrator), ce `@Cron` n'étant qu'un filet de
  * sécurité en continu.
  *
- * OutboxModule/WebhooksModule sont déjà utilisés à l'intérieur
- * d'OrchestratorModule (via PaymentsModule) mais pas ré-exportés par lui —
- * importés ici séparément pour que HealthController (voir /health) puisse
- * lire la taille des files d'attente. Nest réutilise la même instance
- * singleton de chaque service, importer un module deux fois ne duplique rien.
+ * OutboxModule/WebhooksModule/OrchestratorModule sont déjà utilisés à
+ * l'intérieur de PaymentsModule mais pas ré-exportés par lui — importés ici
+ * séparément : OutboxModule/WebhooksModule pour que HealthController (voir
+ * /health) puisse lire la taille des files d'attente, OrchestratorModule
+ * pour que WorkerCronService puisse appeler
+ * PaymentOrchestrator.reconcileStaleProcessingPayments (filet de sécurité
+ * qui rattrape un paiement dont le webhook de confirmation ne serait jamais
+ * arrivé). Nest réutilise la même instance singleton de chaque service,
+ * importer un module deux fois ne duplique rien.
  */
 @Module({
   imports: [
@@ -49,6 +54,7 @@ import { AlertingService } from './worker/alerting.service';
     OutboxModule,
     OutboxProcessorModule,
     WebhooksModule,
+    OrchestratorModule,
     DashboardAuthModule,
     DashboardModule,
     SiteContentModule,
